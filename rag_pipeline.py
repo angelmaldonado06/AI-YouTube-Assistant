@@ -10,8 +10,11 @@ from transcript import (
     normalize_transcript_entries,
 )
 
+_llm_cache = None
 
-def build_transcript_documents(transcript_entries, chunk_size=800, chunk_overlap=100):
+
+def build_transcript_documents(transcript_entries, chunk_size=800, chunk_overlap=100) -> list:
+    """Split transcript entries into Document chunks with timestamps."""
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -31,28 +34,36 @@ def build_transcript_documents(transcript_entries, chunk_size=800, chunk_overlap
     return text_splitter.split_documents(documents)
 
 
-def create_embedding_model():
+def create_embedding_model() -> HuggingFaceEmbeddings:
+    """Create HuggingFace embedding model for text vectorization."""
     return HuggingFaceEmbeddings(model_name="BAAI/bge-base-en-v1.5")
 
+def create_llm() -> OllamaLLM:
+    """Create or return cached Ollama LLM instance."""
+    global _llm_cache
+    if _llm_cache is None:
+        _llm_cache = OllamaLLM(model="llama3.1", temperature=0.3)
+    return _llm_cache
 
-def create_llm():
-    return OllamaLLM(model="llama3.1", temperature=0.3)
 
-
-def create_faiss_index_from_documents(documents, embedding_model):
+def create_faiss_index_from_documents(documents, embedding_model) -> FAISS:
+    """Build FAISS vector index from document embeddings."""
     return FAISS.from_documents(documents, embedding_model)
 
 
-def retrieve_documents(query, faiss_index, k=4):
+def retrieve_documents(query, faiss_index, k=4) -> list:
+    """Retrieve top-k most similar documents from FAISS index."""
     return faiss_index.similarity_search(query, k=k)
 
 
-def retrieve(query, faiss_index, k=4):
+def retrieve(query, faiss_index, k=4) -> str:
+    """Retrieve and format top-k documents as concatenated context string."""
     docs = retrieve_documents(query, faiss_index, k=k)
     return "\n\n".join(doc.page_content for doc in docs)
 
 
-def prepare_video(video_url):
+def prepare_video(video_url) -> tuple[str, FAISS | None]:
+    """Fetch video transcript and build FAISS index."""
     if not video_url:
         return "", None
 

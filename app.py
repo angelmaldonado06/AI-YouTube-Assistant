@@ -1,16 +1,15 @@
 import gradio as gr
-from rag_pipeline import prepare_video, retrieve, create_llm
+from rag_pipeline import prepare_video, create_llm
 from prompts import (
-    create_summary_prompt,
-    create_summary_chain,
-    create_qa_prompt_template,
-    create_qa_chain
+    create_summary_prompt
 )
+from graph import rag_graph, RAGState
 
 processed_transcript = ""
 faiss_index = None
 
-def summarize_video(video_url):
+def summarize_video(video_url) -> str:
+    """Fetch video transcript and generate a concise summary."""
     global processed_transcript, faiss_index
 
     processed_transcript, faiss_index = prepare_video(video_url)
@@ -18,9 +17,9 @@ def summarize_video(video_url):
     if processed_transcript:
         llm = create_llm()
         summary_prompt = create_summary_prompt()
-        summary_chain = create_summary_chain(llm, summary_prompt)
+        summary_chain = summary_prompt | llm
 
-        summary = summary_chain.run({
+        summary = summary_chain.invoke({
             "transcript" : processed_transcript
         })
         return summary
@@ -28,26 +27,29 @@ def summarize_video(video_url):
         return "No transcripts available"
     
 
-def answer_question(video_url, question):
+def answer_question(video_url, question) -> str:
+    """Answer a question based on video transcript using the RAG graph."""
     global processed_transcript, faiss_index
 
     if not processed_transcript:
         processed_transcript, faiss_index = prepare_video(video_url)
     
     if processed_transcript and question:
-        llm = create_llm()
+        state = RAGState(
+            query = question,
+            video_url = video_url,
+            processed_transcripts = processed_transcript,
+            chunks = [],
+            faiss_index = faiss_index,
+            final_answer = "",
+            retrieved_context = "",
+            needs_retrieval = False,
+            router_confidence = 0.0,
+            routing_decision = ""
+        )
 
-        context = retrieve(question, faiss_index)
-        qa_prompt = create_qa_prompt_template()
-
-        qa_chain = create_qa_chain(llm, qa_prompt)
-
-        answer = qa_chain.run({
-            "context" : context,
-            "question" : question
-        })
-
-        return answer
+        result = rag_graph.invoke(state)
+        return result['final_answer']
     else:
         return "No transcript available"
 

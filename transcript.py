@@ -2,7 +2,8 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import re
 
 
-def get_video_id(url):    
+def get_video_id(url) -> str | None:
+    """Extract YouTube video ID from URL."""
     # Support common YouTube URL formats
     pattern = (
         r"(?:https?:\/\/)?(?:www\.)?"
@@ -13,8 +14,8 @@ def get_video_id(url):
     return match.group(1) if match else None
 
  
-def get_transcript(url):
-
+def get_transcript(url) -> list | None:
+    """Fetch transcript entries from YouTube video URL."""
     video_id = get_video_id(url)
     ytt_api = YouTubeTranscriptApi()
 
@@ -35,15 +36,16 @@ def get_transcript(url):
     return transcript if transcript else None
 
 
-def seconds_to_hhmmss(seconds):
-
+def seconds_to_hhmmss(seconds) -> str:
+    """Convert seconds to HH:MM:SS timestamp format."""
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
 
 
-def normalize_transcript_entries(transcript):
+def normalize_transcript_entries(transcript) -> list[dict]:
+    """Convert transcript entries to normalized format with timestamps."""
     normalized_entries = []
 
     for entry in transcript:
@@ -64,16 +66,11 @@ def normalize_transcript_entries(transcript):
     return normalized_entries
 
 
-def format_transcript_entries(transcript_entries):
+def format_transcript_entries(transcript_entries) -> str:
+    """Format transcript entries into a single readable string with timestamps."""
     txt = ""
 
     for entry in transcript_entries:
         txt += f"Text: {entry['text']} Timestamp: {entry['timestamp']}\n"
 
     return txt
-
-
-def process(transcript):
-    # Keep backward compatibility with the original app while normalizing first.
-    normalized_entries = normalize_transcript_entries(transcript)
-    return format_transcript_entries(normalized_entries)

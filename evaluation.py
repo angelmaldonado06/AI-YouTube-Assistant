@@ -22,7 +22,8 @@ from rag_pipeline import (
 )
 
 
-def load_eval_questions(dataset_path):
+def load_eval_questions(dataset_path) -> list[dict]:
+    """Load evaluation questions and ground truth from JSON file."""
     with open(dataset_path, "r", encoding="utf-8") as file:
         payload = json.load(file)
 
@@ -40,15 +41,18 @@ def load_eval_questions(dataset_path):
     return payload
 
 
-def create_eval_llm(model_name="llama3.1"):
+def create_eval_llm(model_name="llama3.1") -> ChatOllama:
+    """Create ChatOllama LLM instance for evaluation."""
     return ChatOllama(model=model_name, temperature=0)
 
 
-def build_context(documents):
+def build_context(documents) -> str:
+    """Join document page contents into a single context string."""
     return "\n\n".join(doc.page_content for doc in documents)
 
 
-def generate_answer(question, vectorstore, qa_chain, retrieval_k):
+def generate_answer(question, vectorstore, qa_chain, retrieval_k) -> tuple[str, list]:
+    """Retrieve documents and generate answer from question."""
     retrieved_docs = retrieve_documents(question, vectorstore, k=retrieval_k)
     context = build_context(retrieved_docs)
     answer = qa_chain.invoke(
@@ -61,7 +65,8 @@ def generate_answer(question, vectorstore, qa_chain, retrieval_k):
     return answer, retrieved_docs
 
 
-def build_eval_rows(video_url, eval_questions, retrieval_k=4, qa_model_name="llama3.1"):
+def build_eval_rows(video_url, eval_questions, retrieval_k=4, qa_model_name="llama3.1") -> list[dict]:
+    """Generate evaluation rows with answers and contexts for all questions."""
     _, vectorstore = prepare_video(video_url)
     if vectorstore is None:
         raise ValueError("Could not prepare the video transcript for evaluation.")
@@ -95,6 +100,7 @@ def build_eval_rows(video_url, eval_questions, retrieval_k=4, qa_model_name="lla
 
 
 def run_ragas_eval(video_url, dataset_path, retrieval_k=4, qa_model_name="llama3.1"):
+    """Evaluate RAG system on video using RAGAS metrics."""
     eval_questions = load_eval_questions(dataset_path)
     rows = build_eval_rows(
         video_url=video_url,
@@ -122,7 +128,8 @@ def run_ragas_eval(video_url, dataset_path, retrieval_k=4, qa_model_name="llama3
     return result
 
 
-def main():
+def main() -> None:
+    """Parse CLI arguments and run RAGAS evaluation."""
     parser = argparse.ArgumentParser(description="Run RAGAS evaluation for the YouTube RAG app.")
     parser.add_argument("--video-url", required=True, help="Target YouTube video URL.")
     parser.add_argument(

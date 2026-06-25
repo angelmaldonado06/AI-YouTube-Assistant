@@ -61,12 +61,6 @@ pip install -r requirements.txt
 ollama pull llama3.1
 ```
 
-5. Start the model:
-
-```bash
-ollama run llama3.1
-```
-
 ## Run the App
 
 ```bash

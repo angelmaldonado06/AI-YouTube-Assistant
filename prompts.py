@@ -1,9 +1,8 @@
 from langchain_core.prompts import PromptTemplate
-from langchain_classic.chains import LLMChain
 
 
-def create_summary_prompt():
-
+def create_summary_prompt() -> PromptTemplate:
+    """Create prompt template for video summarization."""
     template = """
     You are an AI assistant tasked with summarizing YouTube video transcripts. Provide concise, informative summaries that capture the main points of the video content.
 
@@ -29,12 +28,8 @@ def create_summary_prompt():
     return prompt
 
 
-def create_summary_chain(llm, prompt, verbose=True):
-    return LLMChain(llm=llm, prompt=prompt, verbose=verbose)
-
-
-def create_qa_prompt_template():
-   
+def create_qa_prompt() -> PromptTemplate:
+    """Create prompt template for context-grounded question answering."""
     qa_template = """
     You are an expert assistant providing detailed and accurate answers based on the following video content. Your responses should be:
 
@@ -60,7 +55,55 @@ def create_qa_prompt_template():
     )
     return prompt_template
 
+def create_general_prompt() -> PromptTemplate:
+    '''Create prompt template for general knowledge'''
 
-def create_qa_chain(llm, prompt_template, verbose=True):
-    return LLMChain(llm=llm, prompt=prompt_template, verbose=verbose)
+    general_template = """
+    You are a helpful assistant. Answer the user's question concisely and naturally.
+    User's question: {question}
 
+    """
+
+    prompt_template = PromptTemplate(
+        input_variables =["question"],
+        template = general_template
+    )
+
+    return prompt_template
+
+
+def create_router_prompt() -> PromptTemplate:
+    router_prompt = """
+    You are a routing agent. Determine if the following user query requires the video transcript to answer correctly.
+
+    User Query: {question}
+
+    Respond ONLY with valid JSON in this format:
+    {{"needs_transcript": true/false, "confidence": 0.0-1.0}}
+
+    Decision rules:
+    - needs_transcript: true if the question explicitly references the VIDEO/SPEAKER/CONTENT
+    - needs_transcript: false if the question asks about general knowledge without video context
+
+    VIDEO KEYWORDS (set needs_transcript=true if present):
+    "speaker", "he say", "she explain", "the author", "the presenter", "does the video",
+    "in the video", "at minute", "timestamp", "this video", "the example", "according to the video"
+
+    GENERAL KNOWLEDGE (set needs_transcript=false):
+    "what is", "explain", "how does", "define" (without video references)
+
+    - confidence: your confidence (0.0-1.0) in this decision
+
+    Examples:
+    - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95}}
+    - "What's the capital of France?" → {{"needs_transcript": false, "confidence": 0.9}}
+    - "What are hidden layers?" → {{"needs_transcript": false, "confidence": 0.85}} (ambiguous, no video reference)
+    - "How does he explain neural networks?" → {{"needs_transcript": true, "confidence": 0.9}} (explicit video reference)
+    """
+
+    prompt_template = PromptTemplate(
+        input_variables = ["question"],
+        template = router_prompt
+    )
+
+    return prompt_template

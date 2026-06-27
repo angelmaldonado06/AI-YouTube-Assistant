@@ -3,7 +3,9 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_ollama import OllamaLLM
 from langchain_core.documents import Document
-
+from typing import List
+from prompts import create_queries_prompt
+import json
 from transcript import (
     format_transcript_entries,
     get_transcript,
@@ -81,3 +83,33 @@ def prepare_video(video_url) -> tuple[str, FAISS | None]:
     )
 
     return processed_transcript, faiss_index
+
+def generate_rephrased_queries(question:str) -> List:
+
+    llm = create_llm()
+    prompt = create_queries_prompt()
+    chain = prompt | llm
+
+    response = chain.invoke({
+        "question":question
+    })
+
+    print(f"\n{'='*70}")
+    print(f"MULTI-QUERY")
+    print(f"{'='*70}")
+    print(f"Raw LLM Response: {response}")
+
+    try:
+        parsed = json.loads(response)
+        if isinstance(parsed, dict):
+            queries = parsed.get("queries",[])
+        elif isinstance(parsed,dict):
+            queries = parsed
+        else:
+            queries = []
+
+        return queries
+    
+    except json.JSONDecodeError as e:
+        print(f"Error parsing queries: {e}")
+        return []

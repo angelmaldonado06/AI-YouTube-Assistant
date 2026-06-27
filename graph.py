@@ -1,8 +1,9 @@
 from typing import TypedDict, Optional, List
 import json
-from rag_pipeline import create_llm, retrieve
+from rag_pipeline import create_llm, retrieve, generate_rephrased_queries, retrieve_documents
 from prompts import create_qa_prompt, create_general_prompt, create_router_prompt
 from langgraph.graph import StateGraph, END, START
+
 
 class RAGState(TypedDict):
     """
@@ -32,7 +33,7 @@ def router_node(state: RAGState) -> dict:
     raw_response = router_chain.invoke({"question": state['query']})
 
     print(f"\n{'='*70}")
-    print(f"ROUTER DEBUG | Query: {state['query']}")
+    print(f"Query: {state['query']}")
     print(f"{'='*70}")
     print(f"Raw LLM Response: {raw_response}")
 
@@ -66,7 +67,28 @@ def router_node(state: RAGState) -> dict:
 
 def retrieve_node(state: RAGState) -> RAGState:
     """Retrieve relevant transcript chunks based on query."""
-    context = retrieve(state['query'], state['faiss_index'])
+
+    #generating multi-queries
+    queries = [state["query"]]
+    rephrased = generate_rephrased_queries(state['query'])
+    queries.extend(rephrased)
+
+    #search faiss
+    all_docs = []
+    for q in queries:
+        docs = retrieve_documents(q, state["faiss_index"])
+        all_docs.extend(docs)
+
+    #remove duplicates
+    seen = set()
+    unique_docs = []
+
+    for doc in all_docs:
+        if doc.page_content not in seen:
+            seen.add(doc.page_content)
+            unique_docs.append(doc)
+    
+    context = "\n\n".join([doc.page_content for doc in unique_docs])
     state['retrieved_context'] = context
     needs_retrieval = bool(context.strip())
     state['needs_retrieval'] = needs_retrieval

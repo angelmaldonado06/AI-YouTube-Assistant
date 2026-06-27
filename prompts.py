@@ -107,3 +107,21 @@ def create_router_prompt() -> PromptTemplate:
     )
 
     return prompt_template
+
+
+def create_queries_prompt() -> PromptTemplate:
+    multiqueries_template = """
+    TASK: Generate 3 alternative phrasings of the question.
+
+    Question: "{question}"
+
+    RESPOND WITH ONLY THIS JSON, NO EXPLANATION, NO CODE:
+    {{"queries": ["alternative 1", "alternative 2", "alternative 3"]}}
+    """
+
+    prompt_template = PromptTemplate(
+        input_variables=["question"],
+        template = multiqueries_template
+    )
+
+    return prompt_template

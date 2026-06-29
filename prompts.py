@@ -74,24 +74,16 @@ def create_general_prompt() -> PromptTemplate:
 
 def create_router_prompt() -> PromptTemplate:
     router_prompt = """
-    You are a routing agent. Determine if the following user query requires the video transcript to answer correctly.
+    You are a routing agent. Decide if this question needs the video transcript.
 
-    User Query: {question}
+    Question: {question}
 
-    Respond ONLY with valid JSON in this format:
+    RESPOND WITH ONLY THIS JSON, NO EXPLANATION:
     {{"needs_transcript": true/false, "confidence": 0.0-1.0}}
 
-    Decision rules:
-    - needs_transcript: true if the question explicitly references the VIDEO/SPEAKER/CONTENT
-    - needs_transcript: false if the question asks about general knowledge without video context
-
-    VIDEO KEYWORDS (set needs_transcript=true if present):
-    "speaker", "he say", "she explain", "the author", "the presenter", "does the video",
-    "in the video", "at minute", "timestamp", "this video", "the example", "according to the video"
-
-    GENERAL KNOWLEDGE (set needs_transcript=false):
-    "what is", "explain", "how does", "define" (without video references)
-
+    Rules:
+    - needs_transcript=true if question references VIDEO/SPEAKER/CONTENT
+    - needs_transcript=false if question asks general knowledge
     - confidence: your confidence (0.0-1.0) in this decision
 
     Examples:

@@ -1,8 +1,9 @@
 from typing import TypedDict, Optional, List
 import json
-from rag_pipeline import create_llm, retrieve, generate_rephrased_queries, retrieve_documents
+from rag_pipeline import create_llm, generate_rephrased_queries, retrieve_documents, get_reranker
 from prompts import create_qa_prompt, create_general_prompt, create_router_prompt
 from langgraph.graph import StateGraph, END, START
+from langchain_core.documents import Document
 
 
 class RAGState(TypedDict):
@@ -19,6 +20,7 @@ class RAGState(TypedDict):
     needs_retrieval: bool
     router_confidence: float
     routing_decision: str
+    retrieved_documents: List[Document]
 
 
 # TODO: Upgrade 7 — refactor this to a class-based Router with Pydantic BaseModel
@@ -79,6 +81,7 @@ def retrieve_node(state: RAGState) -> RAGState:
         docs = retrieve_documents(q, state["faiss_index"])
         all_docs.extend(docs)
 
+
     #remove duplicates
     seen = set()
     unique_docs = []
@@ -89,10 +92,38 @@ def retrieve_node(state: RAGState) -> RAGState:
             unique_docs.append(doc)
     
     context = "\n\n".join([doc.page_content for doc in unique_docs])
+
     state['retrieved_context'] = context
-    needs_retrieval = bool(context.strip())
-    state['needs_retrieval'] = needs_retrieval
+    state["retrieved_documents"] = unique_docs
+    state['needs_retrieval'] = bool(context.strip())
+
     return state
+
+def rerank_node(state: RAGState) ->RAGState:
+    '''Re-rank retrieved documents by relevance using cross-encoder.''' 
+    documents = state["retrieved_documents"]
+    question = state["query"]
+    ranker = get_reranker()
+
+    pairs = [(question, doc.page_content) for doc in documents]
+    scores = ranker.predict(pairs)
+
+    ranked_docs = [doc for score, doc in sorted(zip(scores, documents), key=lambda x: -x[0])][:3]
+
+    print(f"\n{'='*70}")
+    print(f"RERANKING RESULTS")
+    print(f"{'='*70}")
+    for i, (score, doc) in enumerate(sorted(zip(scores, documents), key=lambda x: -x[0])[:3], 1):
+        print(f"Rank {i} (score: {score:.4f})")
+        print(f"  {doc.page_content[:100]}...")
+    print(f"{'='*70}\n")
+    
+    context = "\n\n".join([doc.page_content for doc in ranked_docs]) 
+
+    state["retrieved_context"] = context
+
+    return state
+
 
 def generation_node(state: RAGState) -> RAGState:
     """Generate answer using LLM with retrieved context."""
@@ -120,6 +151,7 @@ graph_builder = StateGraph(RAGState)
 graph_builder.add_node("router", router_node)
 graph_builder.add_node("retrieve", retrieve_node)
 graph_builder.add_node("generate", generation_node)
+graph_builder.add_node("rerank", rerank_node)
 graph_builder.add_node("output", output_node)
 
 # Set entry point
@@ -130,7 +162,8 @@ def route_decision(state):
 
 graph_builder.add_conditional_edges("router", route_decision)
 # Connect remaining edges
-graph_builder.add_edge("retrieve", "generate")
+graph_builder.add_edge("retrieve", "rerank")
+graph_builder.add_edge("rerank", "generate")
 graph_builder.add_edge("generate", "output")
 graph_builder.add_edge("output", END)
 

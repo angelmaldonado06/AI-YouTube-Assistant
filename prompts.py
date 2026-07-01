@@ -31,26 +31,26 @@ def create_summary_prompt() -> PromptTemplate:
 def create_qa_prompt() -> PromptTemplate:
     """Create prompt template for context-grounded question answering."""
     qa_template = """
-    You are an expert assistant providing detailed and accurate answers based on the following video content. Your responses should be:
+    You are an expert assistant providing detailed and accurate answers based on the following video content and conversation history. Your responses should be:
 
     1. Precise and free from repetition
     2. Consistent with the information provided in the video
     3. Well-organized and easy to understand
     4. Focused on addressing the user's question directly
-    5. Mention at most ONE timestamp from the context.
-    6. Always place the timestamp at the end of the answer.
+    5. Mention the timestamp where you found this information.
 
-    Only answer using the provided context.
+    Only answer using the provided context or the conversation history.
     If the answer is not in the context, say "The video does not mention this."
 
     Note: In the transcript, "Text" refers to the spoken words in the video, timestamp indicated when that part begins in the video.
  
     Relevant Video Context: {context}
+    Conversation History: {conversation_history}
     Based on the above context, please answer the following question: {question}
     """
 
     prompt_template = PromptTemplate(
-        input_variables=["context", "question"],
+        input_variables=["context", "question", "conversation_history"],
         template=qa_template
     )
     return prompt_template
@@ -60,12 +60,13 @@ def create_general_prompt() -> PromptTemplate:
 
     general_template = """
     You are a helpful assistant. Answer the user's question concisely and naturally.
+    If necessary, use the convesation history: {conversation_history}
     User's question: {question}
 
     """
 
     prompt_template = PromptTemplate(
-        input_variables =["question"],
+        input_variables =["question", "conversation_history"],
         template = general_template
     )
 

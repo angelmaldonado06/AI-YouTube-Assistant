@@ -4,6 +4,7 @@ from rag_pipeline import create_llm, generate_rephrased_queries, retrieve_docume
 from prompts import create_qa_prompt, create_general_prompt, create_router_prompt
 from langgraph.graph import StateGraph, END, START
 from langchain_core.documents import Document
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 
 class RAGState(TypedDict):
@@ -21,6 +22,7 @@ class RAGState(TypedDict):
     router_confidence: float
     routing_decision: str
     retrieved_documents: List[Document]
+    conversation_history: List[BaseMessage]
 
 
 # TODO: Upgrade 7 — refactor this to a class-based Router with Pydantic BaseModel
@@ -118,12 +120,11 @@ def rerank_node(state: RAGState) ->RAGState:
         print(f"  {doc.page_content[:100]}...")
     print(f"{'='*70}\n")
     
-    context = "\n\n".join([doc.page_content for doc in ranked_docs]) 
+    context = "\n\n".join([f"{doc.page_content} (Timestamp: {doc.metadata.get('timestamp', 'N/A')})" for doc in ranked_docs])
 
     state["retrieved_context"] = context
 
     return state
-
 
 def generation_node(state: RAGState) -> RAGState:
     """Generate answer using LLM with retrieved context."""
@@ -132,18 +133,22 @@ def generation_node(state: RAGState) -> RAGState:
     prompt = create_general_prompt() if state['routing_decision'] == 'generate' else create_qa_prompt()
     chain = prompt | llm
 
+    state['conversation_history'].append(HumanMessage(content=state['query']))
+
     if state['routing_decision'] == 'generate':
-        answer = chain.invoke({"question": state['query']})
+        answer = chain.invoke({"question": state['query'], 'conversation_history': state['conversation_history']})
     else:
-        answer = chain.invoke({"context": state['retrieved_context'], "question": state['query']})
+        answer = chain.invoke({"context": state['retrieved_context'], "question": state['query'], 'conversation_history': state['conversation_history']})
     
     state['final_answer'] = answer
+
+    state['conversation_history'].append(AIMessage(content=answer))
+
     return state
 
 def output_node(state: RAGState) -> RAGState:
     """Return final answer from state."""
     return {"final_answer": state['final_answer']}
-
 
 graph_builder = StateGraph(RAGState)
 

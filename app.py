@@ -7,6 +7,7 @@ from graph import rag_graph, RAGState
 
 processed_transcript = ""
 faiss_index = None
+conversation_history = []
 
 def summarize_video(video_url) -> str:
     """Fetch video transcript and generate a concise summary."""
@@ -29,7 +30,7 @@ def summarize_video(video_url) -> str:
 
 def answer_question(video_url, question) -> str:
     """Answer a question based on video transcript using the RAG graph."""
-    global processed_transcript, faiss_index
+    global processed_transcript, faiss_index, conversation_history
 
     if not processed_transcript:
         processed_transcript, faiss_index = prepare_video(video_url)
@@ -45,10 +46,12 @@ def answer_question(video_url, question) -> str:
             retrieved_context = "",
             needs_retrieval = False,
             router_confidence = 0.0,
-            routing_decision = ""
+            routing_decision = "",
+            conversation_history = conversation_history
         )
 
         result = rag_graph.invoke(state)
+        conversation_history = result['conversation_history']
         return result['final_answer']
     else:
         return "No transcript available"

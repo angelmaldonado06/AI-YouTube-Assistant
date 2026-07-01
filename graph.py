@@ -1,7 +1,8 @@
 from typing import TypedDict, Optional, List
 import json
-from rag_pipeline import create_llm, generate_rephrased_queries, retrieve_documents, get_reranker
-from prompts import create_qa_prompt, create_general_prompt, create_router_prompt
+from rag_pipeline import generate_rephrased_queries, retrieve_documents, get_reranker
+from prompts import create_qa_prompt, create_general_prompt, create_router_prompt, create_eval_prompt
+from llms import get_llm, get_eval_llm
 from langgraph.graph import StateGraph, END, START
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
@@ -23,6 +24,9 @@ class RAGState(TypedDict):
     routing_decision: str
     retrieved_documents: List[Document]
     conversation_history: List[BaseMessage]
+    attempt_count: int
+    eval_score: float
+    reflection_feedback: str 
 
 
 # TODO: Upgrade 7 — refactor this to a class-based Router with Pydantic BaseModel
@@ -31,7 +35,7 @@ class RAGState(TypedDict):
 
 def router_node(state: RAGState) -> dict:
     """Decide whether to retrieve from transcript or answer directly."""
-    llm = create_llm()
+    llm = get_llm()
     router_prompt = create_router_prompt()
     router_chain = router_prompt | llm
     raw_response = router_chain.invoke({"question": state['query']})
@@ -93,7 +97,7 @@ def retrieve_node(state: RAGState) -> RAGState:
             seen.add(doc.page_content)
             unique_docs.append(doc)
     
-    context = "\n\n".join([doc.page_content for doc in unique_docs])
+    context = "\n\n".join([f"{doc.page_content} (Timestamp: {doc.metadata.get('timestamp', 'N/A')})" for doc in unique_docs])
 
     state['retrieved_context'] = context
     state["retrieved_documents"] = unique_docs
@@ -128,7 +132,7 @@ def rerank_node(state: RAGState) ->RAGState:
 
 def generation_node(state: RAGState) -> RAGState:
     """Generate answer using LLM with retrieved context."""
-    llm = create_llm()
+    llm = get_llm()
 
     prompt = create_general_prompt() if state['routing_decision'] == 'generate' else create_qa_prompt()
     chain = prompt | llm
@@ -141,9 +145,38 @@ def generation_node(state: RAGState) -> RAGState:
         answer = chain.invoke({"context": state['retrieved_context'], "question": state['query'], 'conversation_history': state['conversation_history']})
     
     state['final_answer'] = answer
-
     state['conversation_history'].append(AIMessage(content=answer))
 
+    return state
+
+def reflection_node(state:RAGState) -> RAGState:
+    '''Critique own output and revise it'''
+    judge = get_eval_llm()
+    prompt = create_eval_prompt()
+    chain = prompt | judge
+
+    response = chain.invoke({'context': state["retrieved_context"], 'question': state["query"], 'answer': state["final_answer"]})
+
+    try:
+        parsed = json.loads(response)
+
+        score = parsed.get("score", 0)
+        decision = parsed.get("decision", "Fail")
+        feedback = parsed.get("feedback")
+
+        print(f"  Score: {score}")
+        print(f"  Decision: {decision}")
+        print(f"  Feedback: {feedback}")
+
+        state['reflection_feedback'] = feedback
+
+        state['eval_score'] = score
+        state['attempt_count'] += 1
+
+    except json.JSONDecodeError as e:
+        print(f"JSON Parse Error: {e}")
+        print(f"Evaluation failed")
+        print(f"{'='*70}\n")
     return state
 
 def output_node(state: RAGState) -> RAGState:
@@ -155,8 +188,9 @@ graph_builder = StateGraph(RAGState)
 # Add all nodes
 graph_builder.add_node("router", router_node)
 graph_builder.add_node("retrieve", retrieve_node)
-graph_builder.add_node("generate", generation_node)
 graph_builder.add_node("rerank", rerank_node)
+graph_builder.add_node("generate", generation_node)
+graph_builder.add_node("reflection", reflection_node)
 graph_builder.add_node("output", output_node)
 
 # Set entry point
@@ -164,12 +198,22 @@ graph_builder.add_edge(START, "router")
 
 def route_decision(state):
     return state.get("routing_decision", "generate")
-
+def should_regenerate(state):
+    keywords = ['concise', 'incomplete', 'unclear', 'redundant', 'could', 'however']
+    if (state['eval_score'] < 7 or any(keyword in state['reflection_feedback'].lower() for keyword in keywords)) and state['attempt_count'] < 3:
+        return "regenerate"
+    else:
+        return "output"
+    
 graph_builder.add_conditional_edges("router", route_decision)
-# Connect remaining edges
+graph_builder.add_conditional_edges("reflection", should_regenerate, {
+    "regenerate" : "generate",
+    "output":"output"
+})
+
 graph_builder.add_edge("retrieve", "rerank")
 graph_builder.add_edge("rerank", "generate")
-graph_builder.add_edge("generate", "output")
+graph_builder.add_edge("generate", "reflection")
 graph_builder.add_edge("output", END)
 
 # Compile the graph

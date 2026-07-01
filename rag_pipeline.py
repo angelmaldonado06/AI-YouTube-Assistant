@@ -1,19 +1,18 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_ollama import OllamaLLM
 from langchain_core.documents import Document
 from sentence_transformers import CrossEncoder
 from typing import List
 from prompts import create_queries_prompt
 import json
+from llms import get_llm
 from transcript import (
     format_transcript_entries,
     get_transcript,
     normalize_transcript_entries,
 )
 
-_llm_cache = None
 _reranker_cache = None
 
 # MAIN ENTRY POINT: Orchestrates the full ingestion + indexing pipeline
@@ -83,7 +82,7 @@ def retrieve(query, faiss_index, k=4) -> str:
 
 def generate_rephrased_queries(question: str) -> List:
     """Generate 3 alternative phrasings of the question for multi-query retrieval."""
-    llm = create_llm()
+    llm = get_llm()
     prompt = create_queries_prompt()
     chain = prompt | llm
 
@@ -106,16 +105,6 @@ def generate_rephrased_queries(question: str) -> List:
     except json.JSONDecodeError as e:
         print(f"Error parsing queries: {e}")
         return []
-
-
-# MODEL INITIALIZATION: Cached LLM and reranker instances
-def create_llm() -> OllamaLLM:
-    """Create or return cached Ollama LLM instance."""
-    global _llm_cache
-    if _llm_cache is None:
-        _llm_cache = OllamaLLM(model="llama3.1", temperature=0.3)
-    return _llm_cache
-
 
 def get_reranker() -> CrossEncoder:
     """Create or return cached CrossEncoder model for reranking."""

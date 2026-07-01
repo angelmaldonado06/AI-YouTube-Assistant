@@ -60,7 +60,7 @@ def create_general_prompt() -> PromptTemplate:
 
     general_template = """
     You are a helpful assistant. Answer the user's question concisely and naturally.
-    If necessary, use the convesation history: {conversation_history}
+    If necessary, use the conversation history: {conversation_history}
     User's question: {question}
 
     """
@@ -117,4 +117,28 @@ def create_queries_prompt() -> PromptTemplate:
         template = multiqueries_template
     )
 
+    return prompt_template
+
+def create_eval_prompt()-> PromptTemplate:
+    eval_prompt="""
+        You are an evaluator judging the quality of an AI response.
+
+        Evaluate based on :
+        1. Correctness (is it factually correct based on context?)
+        2. Relevance ( does it answer the question?)
+        3. Completeness (is it sufficient?)
+        4. Instruction Following (does it follow instructions?)
+
+        Context: {context}
+        Question: {question}
+        Answer: {answer}
+
+        RESPOND WITH ONLY THIS JSON, NO EXPLANATION:
+        {{"score": <1-10>, "decision": "PASS or FAIL", "feedback": "<brief explanation>"}}
+    """
+
+    prompt_template = PromptTemplate(
+        input_variables=["context", "question", "answer"],
+        template = eval_prompt
+    )
     return prompt_template

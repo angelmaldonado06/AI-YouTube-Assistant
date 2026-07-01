@@ -7,6 +7,7 @@ from langchain_ollama import ChatOllama
 from ragas import evaluate
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
+from llms import get_eval_llm
 from ragas.metrics import (
     answer_relevancy,
     context_precision,
@@ -41,11 +42,6 @@ def load_eval_questions(dataset_path) -> list[dict]:
     return payload
 
 
-def create_eval_llm(model_name="llama3.1") -> ChatOllama:
-    """Create ChatOllama LLM instance for evaluation."""
-    return ChatOllama(model=model_name, temperature=0)
-
-
 def build_context(documents) -> str:
     """Join document page contents into a single context string."""
     return "\n\n".join(doc.page_content for doc in documents)
@@ -65,13 +61,13 @@ def generate_answer(question, vectorstore, qa_chain, retrieval_k) -> tuple[str, 
     return answer, retrieved_docs
 
 
-def build_eval_rows(video_url, eval_questions, retrieval_k=4, qa_model_name="llama3.1") -> list[dict]:
+def build_eval_rows(video_url, eval_questions, retrieval_k=4) -> list[dict]:
     """Generate evaluation rows with answers and contexts for all questions."""
     _, vectorstore = prepare_video(video_url)
     if vectorstore is None:
         raise ValueError("Could not prepare the video transcript for evaluation.")
 
-    qa_llm = create_eval_llm(qa_model_name)
+    qa_llm = get_judge_llm()
     qa_prompt = create_qa_prompt_template()
     qa_chain = create_qa_chain(qa_llm, qa_prompt, verbose=False)
 
@@ -110,7 +106,7 @@ def run_ragas_eval(video_url, dataset_path, retrieval_k=4, qa_model_name="llama3
     )
 
     dataset = Dataset.from_list(rows)
-    eval_llm = create_eval_llm(qa_model_name)
+    eval_llm = get_eval_llm(qa_model_name)
     embedding_model = create_embedding_model()
 
     result = evaluate(

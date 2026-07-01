@@ -1,5 +1,6 @@
 import gradio as gr
-from rag_pipeline import prepare_video, create_llm
+from rag_pipeline import prepare_video
+from llms import get_llm
 from prompts import (
     create_summary_prompt
 )
@@ -16,7 +17,7 @@ def summarize_video(video_url) -> str:
     processed_transcript, faiss_index = prepare_video(video_url)
     
     if processed_transcript:
-        llm = create_llm()
+        llm = get_llm()
         summary_prompt = create_summary_prompt()
         summary_chain = summary_prompt | llm
 
@@ -47,7 +48,11 @@ def answer_question(video_url, question) -> str:
             needs_retrieval = False,
             router_confidence = 0.0,
             routing_decision = "",
-            conversation_history = conversation_history
+            retrieved_documents = [],
+            conversation_history = conversation_history,
+            attempt_count= 0,
+            eval_score= 0.0,
+            reflection_feedback = "" 
         )
 
         result = rag_graph.invoke(state)

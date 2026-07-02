@@ -45,14 +45,15 @@ def answer_question(video_url, question) -> str:
             faiss_index = faiss_index,
             final_answer = "",
             retrieved_context = "",
-            needs_retrieval = False,
+            has_retrieved_context = False,
             router_confidence = 0.0,
             routing_decision = "",
             retrieved_documents = [],
             conversation_history = conversation_history,
             attempt_count= 0,
             eval_score= 0.0,
-            reflection_feedback = "" 
+            reflection_feedback = "",
+            reflection_decision = "" 
         )
 
         result = rag_graph.invoke(state)

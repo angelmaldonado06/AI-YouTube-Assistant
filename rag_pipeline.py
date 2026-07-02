@@ -88,7 +88,6 @@ def generate_rephrased_queries(question: str) -> List:
 
     response = chain.invoke({"question": question})
 
-    print(f"\n{'='*70}")
     print(f"MULTI-QUERY")
     print(f"{'='*70}")
     print(f"Raw LLM Response: {response}")

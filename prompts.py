@@ -1,6 +1,5 @@
 from langchain_core.prompts import PromptTemplate
 
-
 def create_summary_prompt() -> PromptTemplate:
     """Create prompt template for video summarization."""
     template = """
@@ -45,12 +44,12 @@ def create_qa_prompt() -> PromptTemplate:
     Note: In the transcript, "Text" refers to the spoken words in the video, timestamp indicated when that part begins in the video.
  
     Relevant Video Context: {context}
-    Conversation History: {conversation_history}
+    If necessary, use the conversation history: {conversation_history}, or the feedback: {feedback_guidance}
     Based on the above context, please answer the following question: {question}
     """
 
     prompt_template = PromptTemplate(
-        input_variables=["context", "question", "conversation_history"],
+        input_variables=["context", "question", "conversation_history","feedback_quidance"],
         template=qa_template
     )
     return prompt_template
@@ -60,13 +59,13 @@ def create_general_prompt() -> PromptTemplate:
 
     general_template = """
     You are a helpful assistant. Answer the user's question concisely and naturally.
-    If necessary, use the conversation history: {conversation_history}
+    If necessary, use the conversation history: {conversation_history}, or the feedback: {feedback_guidance}
     User's question: {question}
 
     """
 
     prompt_template = PromptTemplate(
-        input_variables =["question", "conversation_history"],
+        input_variables =["question", "conversation_history", "feedback_guidance"],
         template = general_template
     )
 
@@ -77,21 +76,28 @@ def create_router_prompt() -> PromptTemplate:
     router_prompt = """
     You are a routing agent. Decide if this question needs the video transcript.
 
+
     Question: {question}
 
     RESPOND WITH ONLY THIS JSON, NO EXPLANATION:
     {{"needs_transcript": true/false, "confidence": 0.0-1.0}}
 
+    VIDEO KEYWORDS (set needs_transcript=true):
+    "speaker", "video", "based on the video", "does the video", "in the video", 
+    "according to", "mentioned", "at minute", "timestamp", "he/she say", "the example"
+
+    GENERAL KNOWLEDGE (set needs_transcript=false):
+    "what is", "explain", "how does", "define" (without video context)
+
     Rules:
-    - needs_transcript=true if question references VIDEO/SPEAKER/CONTENT
+    - needs_transcript=true if question references the video/speaker/content
     - needs_transcript=false if question asks general knowledge
     - confidence: your confidence (0.0-1.0) in this decision
-
+    
     Examples:
     - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95}}
+    - "Based on the video, what are hidden layers?" → {{"needs_transcript": true, "confidence": 0.95}}
     - "What's the capital of France?" → {{"needs_transcript": false, "confidence": 0.9}}
-    - "What are hidden layers?" → {{"needs_transcript": false, "confidence": 0.85}} (ambiguous, no video reference)
-    - "How does he explain neural networks?" → {{"needs_transcript": true, "confidence": 0.9}} (explicit video reference)
     """
 
     prompt_template = PromptTemplate(
@@ -133,12 +139,19 @@ def create_eval_prompt()-> PromptTemplate:
         Question: {question}
         Answer: {answer}
 
+        Needs Transcript: {needs_transcript}
+
+        Evaluate Mode:
+        - If needs_transcript=True: Answer MUST be grounded in provided context
+        - If needs_transcript=False: Answer can be general knowledge (don't penalize for not citing context)
+
+
         RESPOND WITH ONLY THIS JSON, NO EXPLANATION:
-        {{"score": <1-10>, "decision": "PASS or FAIL", "feedback": "<brief explanation>"}}
+        {{"score": <1-10>, "decision": "PASS or needs_improvement or FAIL", "feedback": "<brief explanation>"}}
     """
 
     prompt_template = PromptTemplate(
-        input_variables=["context", "question", "answer"],
+        input_variables=["context", "question", "answer", "needs_transcript"],
         template = eval_prompt
     )
     return prompt_template

@@ -19,7 +19,7 @@ class RAGState(TypedDict):
     faiss_index: Optional[object]
     final_answer: str
     retrieved_context: str
-    needs_retrieval: bool
+    has_retrieved_context: bool
     router_confidence: float
     routing_decision: str
     retrieved_documents: List[Document]
@@ -27,7 +27,7 @@ class RAGState(TypedDict):
     attempt_count: int
     eval_score: float
     reflection_feedback: str 
-
+    reflection_decision: str
 
 # TODO: Upgrade 7 — refactor this to a class-based Router with Pydantic BaseModel
 # and tool binding. For now, keep it simple for Upgrade 1.
@@ -38,15 +38,15 @@ def router_node(state: RAGState) -> dict:
     llm = get_llm()
     router_prompt = create_router_prompt()
     router_chain = router_prompt | llm
-    raw_response = router_chain.invoke({"question": state['query']})
+    response = router_chain.invoke({"question": state['query']})
 
     print(f"\n{'='*70}")
     print(f"Query: {state['query']}")
     print(f"{'='*70}")
-    print(f"Raw LLM Response: {raw_response}")
+
 
     try:
-        parsed = json.loads(raw_response)
+        parsed = json.loads(response)
         print(f"Parsed JSON: {parsed}")
 
         needs_transcript = parsed.get("needs_transcript", False)
@@ -63,7 +63,7 @@ def router_node(state: RAGState) -> dict:
             decision = "retrieve" if needs_transcript else "generate"
             print(f"Routing decision: {decision}")
 
-        print(f"{'='*70}\n")
+        print(f"{'='*70}")
         return {"routing_decision": decision}
 
     except json.JSONDecodeError as e:
@@ -101,7 +101,7 @@ def retrieve_node(state: RAGState) -> RAGState:
 
     state['retrieved_context'] = context
     state["retrieved_documents"] = unique_docs
-    state['needs_retrieval'] = bool(context.strip())
+    state['has_retrieved_context'] = bool(context.strip())
 
     return state
 
@@ -139,11 +139,18 @@ def generation_node(state: RAGState) -> RAGState:
 
     state['conversation_history'].append(HumanMessage(content=state['query']))
 
-    if state['routing_decision'] == 'generate':
-        answer = chain.invoke({"question": state['query'], 'conversation_history': state['conversation_history']})
-    else:
-        answer = chain.invoke({"context": state['retrieved_context'], "question": state['query'], 'conversation_history': state['conversation_history']})
     
+    if state['attempt_count'] > 0 and state.get('reflection_feedback'):
+        feedback_guidance = f"Previous feedback: {state['reflection_feedback']}\nPlease address this in your revised answer."
+    else:
+        feedback_guidance = ""
+
+    if state['routing_decision'] == 'generate':
+        answer = chain.invoke({"question": state['query'], 'conversation_history': state['conversation_history'], 'feedback_guidance': feedback_guidance})
+    else:
+        answer = chain.invoke({"context": state['retrieved_context'], "question": state['query'], 'conversation_history': state['conversation_history'], 'feedback_guidance': feedback_guidance})
+
+
     state['final_answer'] = answer
     state['conversation_history'].append(AIMessage(content=answer))
 
@@ -155,21 +162,26 @@ def reflection_node(state:RAGState) -> RAGState:
     prompt = create_eval_prompt()
     chain = prompt | judge
 
-    response = chain.invoke({'context': state["retrieved_context"], 'question': state["query"], 'answer': state["final_answer"]})
+    response = chain.invoke({
+        'context': state["retrieved_context"],
+        'question': state["query"],
+        'answer': state["final_answer"],
+        'needs_transcript': state['routing_decision'] == "retrieve"
+    })
 
     try:
         parsed = json.loads(response)
 
         score = parsed.get("score", 0)
         decision = parsed.get("decision", "Fail")
-        feedback = parsed.get("feedback")
+        feedback = parsed.get("feedback", "")
 
         print(f"  Score: {score}")
         print(f"  Decision: {decision}")
         print(f"  Feedback: {feedback}")
 
         state['reflection_feedback'] = feedback
-
+        state['reflection_decision'] = decision
         state['eval_score'] = score
         state['attempt_count'] += 1
 
@@ -198,9 +210,11 @@ graph_builder.add_edge(START, "router")
 
 def route_decision(state):
     return state.get("routing_decision", "generate")
+
 def should_regenerate(state):
-    keywords = ['concise', 'incomplete', 'unclear', 'redundant', 'could', 'however']
-    if (state['eval_score'] < 7 or any(keyword in state['reflection_feedback'].lower() for keyword in keywords)) and state['attempt_count'] < 3:
+    needs_regen = (state['eval_score'] < 7 or state['reflection_decision'] == 'needs_improvement')
+
+    if needs_regen and state['attempt_count'] < 3:
         return "regenerate"
     else:
         return "output"

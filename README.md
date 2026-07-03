@@ -122,7 +122,6 @@ youtube-assistant
 |-- graph.py
 |-- llms.py
 |-- prompts.py
-|-- PROJECT_PLAN.md
 |-- rag_pipeline.py
 |-- requirements.txt
 |-- sample_eval_dataset.json

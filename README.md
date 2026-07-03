@@ -11,6 +11,11 @@ This project retrieves a video's transcript, splits it into chunks, embeds those
 - Generate concise summaries of YouTube videos
 - Ask questions about a video and get transcript-grounded answers
 - Preserve timestamps in retrieved transcript chunks
+- Route questions through a LangGraph RAG workflow
+- Improve recall with multi-query retrieval
+- Re-rank retrieved chunks before generation
+- Use conversation memory for follow-up questions
+- Reflect on generated answers and revise when needed
 - Evaluate the RAG pipeline with RAGAS
 
 ## How It Works
@@ -28,6 +33,8 @@ This project retrieves a video's transcript, splits it into chunks, embeds those
               ↓
       FAISS Vector Search
               ↓
+   LangGraph Router / Retrieval
+              ↓
         LLM (Llama 3.1)
               ↓
     Summary / Question Answering
@@ -38,6 +45,7 @@ This project retrieves a video's transcript, splits it into chunks, embeds those
 ### Tech Stack
 
 - LangChain for prompt orchestration and chaining
+- LangGraph for routing, memory, and reflection flow
 - FAISS for vector search
 - Ollama for local model serving
 - Llama 3.1 for generation
@@ -107,11 +115,14 @@ python evaluation.py --video-url "YOUTUBE_URL_HERE" --dataset sample_eval_datase
 ## Project Structure
 
 ```text
-youtube-rag-assistant
+youtube-assistant
 |
 |-- app.py
 |-- evaluation.py
+|-- graph.py
+|-- llms.py
 |-- prompts.py
+|-- PROJECT_PLAN.md
 |-- rag_pipeline.py
 |-- requirements.txt
 |-- sample_eval_dataset.json

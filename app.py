@@ -4,7 +4,7 @@ from llms import get_llm
 from prompts import (
     create_summary_prompt
 )
-from graph import rag_graph, RAGState
+from graph import create_initial_state, rag_graph, RAGState
 
 processed_transcript = ""
 faiss_index = None
@@ -37,23 +37,12 @@ def answer_question(video_url, question) -> str:
         processed_transcript, faiss_index = prepare_video(video_url)
     
     if processed_transcript and question:
-        state = RAGState(
-            query = question,
-            video_url = video_url,
-            processed_transcripts = processed_transcript,
-            chunks = [],
-            faiss_index = faiss_index,
-            final_answer = "",
-            retrieved_context = "",
-            has_retrieved_context = False,
-            router_confidence = 0.0,
-            routing_decision = "",
-            retrieved_documents = [],
-            conversation_history = conversation_history,
-            attempt_count= 0,
-            eval_score= 0.0,
-            reflection_feedback = "",
-            reflection_decision = "" 
+        state = create_initial_state(
+            query=question,
+            video_url=video_url,
+            processed_transcript=processed_transcript,
+            faiss_index=faiss_index,
+            conversation_history=conversation_history,
         )
 
         result = rag_graph.invoke(state)

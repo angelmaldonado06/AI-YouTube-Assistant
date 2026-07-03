@@ -14,7 +14,7 @@ class RAGState(TypedDict):
     """
     query: str
     video_url: str
-    processed_transcripts: str
+    processed_transcript: str
     chunks: List[dict]
     faiss_index: Optional[object]
     final_answer: str
@@ -31,7 +31,27 @@ class RAGState(TypedDict):
 
 # TODO: Upgrade 7 — refactor this to a class-based Router with Pydantic BaseModel
 # and tool binding. For now, keep it simple for Upgrade 1.
-    
+
+def create_initial_state(query: str,video_url: str,processed_transcript: str,faiss_index,conversation_history: List[BaseMessage]) -> RAGState:
+    """Build the graph state in one place so app.py stays simple."""
+    return RAGState(
+        query=query,
+        video_url=video_url,
+        processed_transcript=processed_transcript,
+        chunks=[],
+        faiss_index=faiss_index,
+        final_answer="",
+        retrieved_context="",
+        has_retrieved_context=False,
+        router_confidence=0.0,
+        routing_decision="",
+        retrieved_documents=[],
+        conversation_history=conversation_history,
+        attempt_count=0,
+        eval_score=0.0,
+        reflection_feedback="",
+        reflection_decision="",
+    )
 
 def router_node(state: RAGState) -> dict:
     """Decide whether to retrieve from transcript or answer directly."""
@@ -137,9 +157,6 @@ def generation_node(state: RAGState) -> RAGState:
     prompt = create_general_prompt() if state['routing_decision'] == 'generate' else create_qa_prompt()
     chain = prompt | llm
 
-    state['conversation_history'].append(HumanMessage(content=state['query']))
-
-    
     if state['attempt_count'] > 0 and state.get('reflection_feedback'):
         feedback_guidance = f"Previous feedback: {state['reflection_feedback']}\nPlease address this in your revised answer."
     else:
@@ -152,7 +169,6 @@ def generation_node(state: RAGState) -> RAGState:
 
 
     state['final_answer'] = answer
-    state['conversation_history'].append(AIMessage(content=answer))
 
     return state
 
@@ -187,13 +203,24 @@ def reflection_node(state:RAGState) -> RAGState:
 
     except json.JSONDecodeError as e:
         print(f"JSON Parse Error: {e}")
-        print(f"Evaluation failed")
+        print("Evaluation failed. Keeping current answer instead of looping forever.")
+        state['reflection_feedback'] = "Evaluator returned invalid JSON."
+        state['reflection_decision'] = "PASS"
+        state['eval_score'] = 7
+        state['attempt_count'] += 1
         print(f"{'='*70}\n")
     return state
 
 def output_node(state: RAGState) -> RAGState:
     """Return final answer from state."""
-    return {"final_answer": state['final_answer']}
+    conversation_history = state["conversation_history"] + [
+        HumanMessage(content=state["query"]),
+        AIMessage(content=state["final_answer"]),
+    ]
+    return {
+        "final_answer": state["final_answer"],
+        "conversation_history": conversation_history,
+    }
 
 graph_builder = StateGraph(RAGState)
 
@@ -212,14 +239,21 @@ def route_decision(state):
     return state.get("routing_decision", "generate")
 
 def should_regenerate(state):
-    needs_regen = (state['eval_score'] < 7 or state['reflection_decision'] == 'needs_improvement')
+    reflection_decision = state["reflection_decision"].lower()
+    needs_regen = (
+        state["eval_score"] < 7
+        or reflection_decision in {"needs_improvement", "fail"}
+    )
 
     if needs_regen and state['attempt_count'] < 3:
         return "regenerate"
     else:
         return "output"
     
-graph_builder.add_conditional_edges("router", route_decision)
+graph_builder.add_conditional_edges("router", route_decision, {
+    "retrieve": "retrieve",
+    "generate": "generate",
+})
 graph_builder.add_conditional_edges("reflection", should_regenerate, {
     "regenerate" : "generate",
     "output":"output"

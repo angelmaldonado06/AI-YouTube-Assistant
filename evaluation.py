@@ -67,7 +67,7 @@ def build_eval_rows(video_url, eval_questions, retrieval_k=4) -> list[dict]:
     if vectorstore is None:
         raise ValueError("Could not prepare the video transcript for evaluation.")
 
-    qa_llm = get_judge_llm()
+    qa_llm = get_eval_llm()
     qa_prompt = create_qa_prompt_template()
     qa_chain = create_qa_chain(qa_llm, qa_prompt, verbose=False)
 

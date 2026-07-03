@@ -49,7 +49,7 @@ def create_qa_prompt() -> PromptTemplate:
     """
 
     prompt_template = PromptTemplate(
-        input_variables=["context", "question", "conversation_history","feedback_quidance"],
+        input_variables=["context", "question", "conversation_history","feedback_guidance"],
         template=qa_template
     )
     return prompt_template

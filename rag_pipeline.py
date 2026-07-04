@@ -12,6 +12,7 @@ from transcript import (
     get_transcript,
     normalize_transcript_entries,
 )
+from prompts import create_extract_time_prompt
 
 _reranker_cache = None
 
@@ -90,7 +91,7 @@ def generate_rephrased_queries(question: str) -> List:
 
     print(f"MULTI-QUERY")
     print(f"{'='*70}")
-    print(f"Raw LLM Response: {response}")
+    print(f"LLM Response: {response}")
 
     try:
         parsed = json.loads(response)
@@ -111,3 +112,32 @@ def get_reranker() -> CrossEncoder:
     if _reranker_cache is None:
         _reranker_cache = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
     return _reranker_cache
+
+def extract_time_range(query:str) -> dict:
+    llm = get_llm()
+    prompt = create_extract_time_prompt()
+
+    chain = prompt | llm
+
+    response = chain.invoke({
+        'query': query
+    })
+
+    try:
+        parsed = json.loads(response)
+
+        start_seconds = parsed.get('start_seconds', None)
+        end_seconds = parsed.get('end_seconds', None)
+
+        print(f"    start_seconds: {start_seconds}")
+        print(f"    end_seconds: {end_seconds}")
+
+        if start_seconds is not None and end_seconds is not None:
+            return {"start_seconds":start_seconds, "end_seconds":end_seconds}
+        return None
+
+    except json.JSONDecodeError as e:
+        print(f"Error parsing seconds: {e}")
+        return None
+
+

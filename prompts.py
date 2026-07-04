@@ -10,7 +10,7 @@ def create_summary_prompt() -> PromptTemplate:
     2. Ignore any timestamps in your summary.
     3. Focus on the spoken content (Text) of the video.
 
-    Note: In the transcript, "Text" refers to the spoken words in the video, and "Timestamp" indicates the timestamp when that part begins in the video.<|eot_id|><|start_header_id|>user<|end_header_id|>
+    Note: In the transcript, "Text" refers to the spoken words in the video, and "Timestamp" indicates the timestamp when that part begins in the video.
     Please summarize the following YouTube video transcript:
 
     Video content:
@@ -80,24 +80,34 @@ def create_router_prompt() -> PromptTemplate:
     Question: {question}
 
     RESPOND WITH ONLY THIS JSON, NO EXPLANATION:
-    {{"needs_transcript": true/false, "confidence": 0.0-1.0}}
+    {{
+    "needs_transcript": true/false,
+    "confidence": 0.0-1.0,
+    "has_time_range": true/false
+    }}
 
     VIDEO KEYWORDS (set needs_transcript=true):
     "speaker", "video", "based on the video", "does the video", "in the video", 
     "according to", "mentioned", "at minute", "timestamp", "he/she say", "the example"
 
-    GENERAL KNOWLEDGE (set needs_transcript=false):
-    "what is", "explain", "how does", "define" (without video context)
+    TIME KEYWORDS (set has_time_range=true):
+    "minutes", "end", "hours", "first", "from x to y"
 
     Rules:
     - needs_transcript=true if question references the video/speaker/content
     - needs_transcript=false if question asks general knowledge
     - confidence: your confidence (0.0-1.0) in this decision
+    - has_time_range=true if the question contains ANY time-related keywords OR mentions a time window
+    - has_time_range=false if the question is about general video content without time specification
+        
+    Note: needs_transcript and has_time_range are independent
     
     Examples:
-    - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95}}
-    - "Based on the video, what are hidden layers?" → {{"needs_transcript": true, "confidence": 0.95}}
-    - "What's the capital of France?" → {{"needs_transcript": false, "confidence": 0.9}}
+    - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95, "has_time_range":false}}
+    - "Based on the video, what are hidden layers?" → {{"needs_transcript": true, "confidence": 0.95, "has_time_range":false}}
+    - "What's the capital of France?" → {{"needs_transcript": false, "confidence": 0.9, "has_time_range":false}}
+    - "what happens from minute 3 to minute 10" → {{"needs_transcript": true, "confidence": 0.9, "has_time_range":true}}
+    - "first 5 minutes" → {{"needs_transcript": true, "confidence": 0.9, "has_time_range":true}}
     """
 
     prompt_template = PromptTemplate(
@@ -110,11 +120,11 @@ def create_router_prompt() -> PromptTemplate:
 
 def create_queries_prompt() -> PromptTemplate:
     multiqueries_template = """
-    TASK: Generate 3 alternative phrasings of the question.
+    Generate 3 alternative phrasings of the question.
 
     Question: "{question}"
 
-    RESPOND WITH ONLY THIS JSON, NO EXPLANATION, NO CODE:
+    RESPOND WITH JSON FORMAT:
     {{"queries": ["alternative 1", "alternative 2", "alternative 3"]}}
     """
 
@@ -146,12 +156,35 @@ def create_eval_prompt()-> PromptTemplate:
         - If needs_transcript=False: Answer can be general knowledge (don't penalize for not citing context)
 
 
-        RESPOND WITH ONLY THIS JSON, NO EXPLANATION:
+        RESPOND WITH JSON FORMAT:
         {{"score": <1-10>, "decision": "PASS or needs_improvement or FAIL", "feedback": "<brief explanation>"}}
     """
 
     prompt_template = PromptTemplate(
         input_variables=["context", "question", "answer", "needs_transcript"],
         template = eval_prompt
+    )
+    return prompt_template
+
+def create_extract_time_prompt() -> PromptTemplate:
+    prompt = '''
+    Extract the time range from this user query: {query}.
+
+    RESPOND WITH ONLY JSON FORMAT:
+    {{
+    "start_seconds": float/null,
+    "end_seconds": float/null
+    }}
+
+    Examples:
+    - "what happens from minute 3 to minute 10" → {{"start_seconds": 180, "end_seconds": 600}}
+    - "first 5 minutes" → {{"start_seconds": 0, "end_seconds": 300}}
+    - "what does the speaker say about AI?" → {{"start_seconds": null, "end_seconds": null}}
+
+    '''
+
+    prompt_template = PromptTemplate(
+        input_variables=["query"],
+        template = prompt
     )
     return prompt_template

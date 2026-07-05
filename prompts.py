@@ -74,8 +74,7 @@ def create_general_prompt() -> PromptTemplate:
 
 def create_router_prompt() -> PromptTemplate:
     router_prompt = """
-    You are a routing agent. Decide if this question needs the video transcript.
-
+    You are a routing agent. Decide if this question needs the video transcript AND detect time ranges.
 
     Question: {question}
 
@@ -87,27 +86,26 @@ def create_router_prompt() -> PromptTemplate:
     }}
 
     VIDEO KEYWORDS (set needs_transcript=true):
-    "speaker", "video", "based on the video", "does the video", "in the video", 
+    "speaker", "video", "based on the video", "does the video", "in the video",
     "according to", "mentioned", "at minute", "timestamp", "he/she say", "the example"
 
     TIME KEYWORDS (set has_time_range=true):
-    "minutes", "end", "hours", "first", "from x to y"
+    "minute", "minutes", "second", "seconds", "hour", "hours", "first", "last", "from", "to", "beginning", "end", "start"
 
     Rules:
     - needs_transcript=true if question references the video/speaker/content
     - needs_transcript=false if question asks general knowledge
-    - confidence: your confidence (0.0-1.0) in this decision
-    - has_time_range=true if the question contains ANY time-related keywords OR mentions a time window
-    - has_time_range=false if the question is about general video content without time specification
-        
-    Note: needs_transcript and has_time_range are independent
-    
+    - has_time_range=true if question mentions ANY time words OR specifies a time window
+    - has_time_range=false if question is about video content without time specification
+    - confidence: your confidence (0.0-1.0) in the needs_transcript decision
+
     Examples:
-    - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95, "has_time_range":false}}
-    - "Based on the video, what are hidden layers?" → {{"needs_transcript": true, "confidence": 0.95, "has_time_range":false}}
-    - "What's the capital of France?" → {{"needs_transcript": false, "confidence": 0.9, "has_time_range":false}}
-    - "what happens from minute 3 to minute 10" → {{"needs_transcript": true, "confidence": 0.9, "has_time_range":true}}
-    - "first 5 minutes" → {{"needs_transcript": true, "confidence": 0.9, "has_time_range":true}}
+    - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95, "has_time_range": false}}
+    - "Based on the video, what are hidden layers?" → {{"needs_transcript": true, "confidence": 0.95, "has_time_range": false}}
+    - "What's the capital of France?" → {{"needs_transcript": false, "confidence": 0.9, "has_time_range": false}}
+    - "what does the video say in the first 2 minutes" → {{"needs_transcript": true, "confidence": 0.95, "has_time_range": true}}
+    - "from minute 5 to minute 10" → {{"needs_transcript": true, "confidence": 0.9, "has_time_range": true}}
+    - "first 5 minutes" → {{"needs_transcript": true, "confidence": 0.9, "has_time_range": true}}
     """
 
     prompt_template = PromptTemplate(
@@ -124,7 +122,7 @@ def create_queries_prompt() -> PromptTemplate:
 
     Question: "{question}"
 
-    RESPOND WITH JSON FORMAT:
+    RESPOND WITH ONLY JSON FORMAT, NO EXPLANATION:
     {{"queries": ["alternative 1", "alternative 2", "alternative 3"]}}
     """
 
@@ -156,7 +154,7 @@ def create_eval_prompt()-> PromptTemplate:
         - If needs_transcript=False: Answer can be general knowledge (don't penalize for not citing context)
 
 
-        RESPOND WITH JSON FORMAT:
+        RESPOND WITH ONLY JSON FORMAT, NO EXPLANATION:
         {{"score": <1-10>, "decision": "PASS or needs_improvement or FAIL", "feedback": "<brief explanation>"}}
     """
 
@@ -167,20 +165,28 @@ def create_eval_prompt()-> PromptTemplate:
     return prompt_template
 
 def create_extract_time_prompt() -> PromptTemplate:
+
     prompt = '''
-    Extract the time range from this user query: {query}.
+        Extract the time range from this user query: {query}.
 
-    RESPOND WITH ONLY JSON FORMAT:
-    {{
-    "start_seconds": float/null,
-    "end_seconds": float/null
-    }}
+        Rules (follow these exactly):
+        - "first X minutes/seconds" → start_seconds=0, end_seconds=X*60 (or X if seconds)
+        - "last X minutes/seconds" → start_seconds=99999, end_seconds=99999
+        - "from minute X to minute Y" → start_seconds=X*60, end_seconds=Y*60
+        - "minute X to minute Y" → start_seconds=X*60, end_seconds=Y*60
+        - No time range → start_seconds=null, end_seconds=null
 
-    Examples:
-    - "what happens from minute 3 to minute 10" → {{"start_seconds": 180, "end_seconds": 600}}
-    - "first 5 minutes" → {{"start_seconds": 0, "end_seconds": 300}}
-    - "what does the speaker say about AI?" → {{"start_seconds": null, "end_seconds": null}}
+        Examples:
+        - "first 2 minutes" → {{"start_seconds": 0, "end_seconds": 120}}
+        - "first 5 minutes" → {{"start_seconds": 0, "end_seconds": 300}}
+        - "from minute 3 to minute 10" → {{"start_seconds": 180, "end_seconds": 600}}
+        - "what does the speaker say about AI?" → {{"start_seconds": null, "end_seconds": null}}
 
+        RESPOND WITH ONLY JSON FORMAT, NO EXPLANATION:
+        {{
+        "start_seconds": float/null,
+        "end_seconds": float/null
+        }}
     '''
 
     prompt_template = PromptTemplate(

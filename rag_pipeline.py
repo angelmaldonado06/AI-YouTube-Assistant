@@ -5,7 +5,7 @@ from langchain_core.documents import Document
 from sentence_transformers import CrossEncoder
 from typing import List
 from prompts import create_queries_prompt
-import json
+import json,re
 from llms import get_llm
 from transcript import (
     format_transcript_entries,
@@ -70,7 +70,7 @@ def create_faiss_index_from_documents(documents, embedding_model) -> FAISS:
 
 
 # RETRIEVAL: Search and re-phrase queries for better recall
-def retrieve_documents(query, faiss_index, k=4) -> list:
+def retrieve_documents(query, faiss_index, k=10) -> list:
     """Retrieve top-k most similar documents from FAISS index."""
     return faiss_index.similarity_search(query, k=k)
 
@@ -129,8 +129,7 @@ def extract_time_range(query:str) -> dict:
         start_seconds = parsed.get('start_seconds', None)
         end_seconds = parsed.get('end_seconds', None)
 
-        print(f"    start_seconds: {start_seconds}")
-        print(f"    end_seconds: {end_seconds}")
+        print(f"\nParsed JSON: {parsed}")
 
         if start_seconds is not None and end_seconds is not None:
             return {"start_seconds":start_seconds, "end_seconds":end_seconds}
@@ -140,4 +139,16 @@ def extract_time_range(query:str) -> dict:
         print(f"Error parsing seconds: {e}")
         return None
 
-
+def has_time_keywords(query: str) -> bool:
+    """Detect time range keywords using regex instead of LLM."""
+    patterns = [
+        #\b word boundry, start-end.\d+ one or more digits for the number. \s+ one or more spaces, \s* no spaces
+        r'\b\d+\s*(minute|minutes|min|second|seconds|sec|hour|hours)\b', #any of these words
+        r'\bfirst\s+\d+\b',
+        r'\blast\s+\d+\b',
+        r'\bfrom\s+minute\b',
+        r'\bbeginning\b',
+        r'\bending\b',
+    ]
+    query_lower = query.lower()
+    return any(re.search(p, query_lower) for p in patterns)

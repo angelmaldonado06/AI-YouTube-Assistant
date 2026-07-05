@@ -1,6 +1,6 @@
 from typing import TypedDict, Optional, List
 import json
-from rag_pipeline import generate_rephrased_queries, retrieve_documents, get_reranker, extract_time_range
+from rag_pipeline import generate_rephrased_queries, retrieve_documents, get_reranker, extract_time_range, has_time_keywords
 from prompts import create_qa_prompt, create_general_prompt, create_router_prompt, create_eval_prompt
 from llms import get_llm, get_eval_llm
 from langgraph.graph import StateGraph, END, START
@@ -73,7 +73,8 @@ def router_node(state: RAGState) -> dict:
 
         needs_transcript = parsed.get("needs_transcript", False)
         confidence = parsed.get("confidence", 0.0)
-        has_time_range = parsed.get("has_time_range", False)
+
+        has_time_range = has_time_keywords(state['query']) 
 
         print(f"  needs_transcript: {needs_transcript}")
         print(f"  confidence: {confidence}")
@@ -82,20 +83,20 @@ def router_node(state: RAGState) -> dict:
         # Fallback: if confidence < 0.6, always retrieve
         if confidence < 0.6:
             decision = "retrieve"
-            print(f"Low confidence ({confidence}) → FALLBACK to retrieve")
+            print(f"\nLow confidence ({confidence}) → FALLBACK to retrieve")
         else:
             decision = "retrieve" if needs_transcript or has_time_range else "generate"
-            print(f"Routing decision: {decision}")
+            print(f"\nRouting decision: {decision}")
 
         if has_time_range:
-            print("Extracting time range...")
             time_range = extract_time_range(state['query'])
-            if time_range:
-                state['time_range'] = time_range
-
+        else:
+            time_range = None
         print(f"{'='*70}")
-        return {"routing_decision": decision,
-                "time_range": state["time_range"]}
+        return {
+            "routing_decision": decision,
+            "time_range": time_range
+        }
 
     except json.JSONDecodeError as e:
         print(f"JSON Parse Error: {e}")
@@ -127,7 +128,7 @@ def retrieve_node(state: RAGState) -> RAGState:
         if doc.page_content not in seen:
             seen.add(doc.page_content)
             unique_docs.append(doc)
-    
+
     if state.get('time_range'):
         start = state['time_range']['start_seconds']
         end = state['time_range']['end_seconds']

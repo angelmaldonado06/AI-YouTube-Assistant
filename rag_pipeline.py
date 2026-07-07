@@ -5,14 +5,13 @@ from langchain_core.documents import Document
 from sentence_transformers import CrossEncoder
 from typing import List
 from prompts import create_queries_prompt
-import json,re
+import json
 from llms import get_llm
 from transcript import (
     format_transcript_entries,
     get_transcript,
     normalize_transcript_entries,
 )
-from prompts import create_extract_time_prompt
 
 _reranker_cache = None
 
@@ -75,12 +74,6 @@ def retrieve_documents(query, faiss_index, k=10) -> list:
     return faiss_index.similarity_search(query, k=k)
 
 
-def retrieve(query, faiss_index, k=4) -> str:
-    """Retrieve and format top-k documents as concatenated context string."""
-    docs = retrieve_documents(query, faiss_index, k=k)
-    return "\n\n".join(doc.page_content for doc in docs)
-
-
 def generate_rephrased_queries(question: str) -> List:
     """Generate 3 alternative phrasings of the question for multi-query retrieval."""
     llm = get_llm()
@@ -112,43 +105,3 @@ def get_reranker() -> CrossEncoder:
     if _reranker_cache is None:
         _reranker_cache = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
     return _reranker_cache
-
-def extract_time_range(query:str) -> dict:
-    llm = get_llm()
-    prompt = create_extract_time_prompt()
-
-    chain = prompt | llm
-
-    response = chain.invoke({
-        'query': query
-    })
-
-    try:
-        parsed = json.loads(response)
-
-        start_seconds = parsed.get('start_seconds', None)
-        end_seconds = parsed.get('end_seconds', None)
-
-        print(f"\nParsed JSON: {parsed}")
-
-        if start_seconds is not None and end_seconds is not None:
-            return {"start_seconds":start_seconds, "end_seconds":end_seconds}
-        return None
-
-    except json.JSONDecodeError as e:
-        print(f"Error parsing seconds: {e}")
-        return None
-
-def has_time_keywords(query: str) -> bool:
-    """Detect time range keywords using regex instead of LLM."""
-    patterns = [
-        #\b word boundry, start-end.\d+ one or more digits for the number. \s+ one or more spaces, \s* no spaces
-        r'\b\d+\s*(minute|minutes|min|second|seconds|sec|hour|hours)\b', #any of these words
-        r'\bfirst\s+\d+\b',
-        r'\blast\s+\d+\b',
-        r'\bfrom\s+minute\b',
-        r'\bbeginning\b',
-        r'\bending\b',
-    ]
-    query_lower = query.lower()
-    return any(re.search(p, query_lower) for p in patterns)

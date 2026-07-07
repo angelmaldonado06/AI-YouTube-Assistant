@@ -4,7 +4,7 @@ from llms import get_llm
 from prompts import (
     create_summary_prompt
 )
-from graph import create_initial_state, rag_graph, RAGState
+from graph import create_initial_state, rag_graph
 
 processed_transcript = ""
 faiss_index = None
@@ -29,9 +29,16 @@ def summarize_video(video_url) -> str:
         return "No transcripts available"
     
 
-def answer_question(video_url, question) -> str:
+def answer_question(video_url, question, from_min=None, to_min=None) -> str:
     """Answer a question based on video transcript using the RAG graph."""
     global processed_transcript, faiss_index, conversation_history
+
+    time_range = None
+    if from_min is not None and to_min is not None and from_min >= 0 and to_min > 0:
+        time_range = {
+            "start_seconds": int(from_min * 60),
+            "end_seconds": int(to_min * 60)
+        }
 
     if not processed_transcript:
         processed_transcript, faiss_index = prepare_video(video_url)
@@ -43,6 +50,7 @@ def answer_question(video_url, question) -> str:
             processed_transcript=processed_transcript,
             faiss_index=faiss_index,
             conversation_history=conversation_history,
+            time_range = time_range
         )
 
         result = rag_graph.invoke(state)
@@ -76,6 +84,10 @@ with gr.Blocks() as interface:
         label="Ask a Question"
     )
 
+    with gr.Row():
+        from_min = gr.Number(label="From (min)", minimum=0, value=None, precision=1)
+        to_min = gr.Number(label="To (min)", minimum=0, value=None, precision=1)
+
     answer_output = gr.Textbox(
         label="Answer",
         lines=6
@@ -85,7 +97,7 @@ with gr.Blocks() as interface:
 
     question_btn.click(
         answer_question,
-        inputs=[video_url, question_input],
+        inputs=[video_url, question_input, from_min, to_min],
         outputs=[answer_output]
     )
 

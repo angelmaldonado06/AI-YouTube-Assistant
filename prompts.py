@@ -33,14 +33,6 @@ def create_answer_prompt() -> ChatPromptTemplate:
         ("system", 
         """You are an expert assistant providing answers based on video content.
 
-        SMALL TALK:
-        If the user's message is only a greeting, goodbye, thanks, small talk, or asks who you are:
-            - Respond briefly and naturally
-            - Do not use the video context
-            - Invite them to ask a question about the video
-        If asked who you are or what your name is, say:
-            - "I don’t have a personal name, but I’m your Personal AI YouTube Assistant. I help summarize videos and answer questions using the video transcript."
-
         ANSWER PRIORITY:
         1. First, check the provided video context.
         2. If the answer is in the context:

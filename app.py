@@ -1,17 +1,10 @@
 import gradio as gr
-import logging
 from rag_pipeline import prepare_video
 from llms import get_llm
 from prompts import (
     create_summary_prompt
 )
 from graph import create_initial_state, rag_graph
-
-# Configure logging to see debug output in terminal
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(name)s - %(levelname)s - %(message)s'
-)
 
 processed_transcript = ""
 faiss_index = None
@@ -119,4 +112,5 @@ with gr.Blocks() as interface:
         outputs=[answer_output]
     )
 
-interface.launch()
+if __name__ == "__main__":
+    interface.launch()

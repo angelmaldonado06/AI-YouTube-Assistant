@@ -22,19 +22,22 @@ def get_transcript(url) -> list | None:
 
     ytt_api = YouTubeTranscriptApi()
 
-    transcripts = ytt_api.list(video_id)
-    transcript = None
-    for t in transcripts:
-        if t.language_code == "en":
+    try:
+        transcripts = ytt_api.list(video_id)
+        transcript = None
+        for t in transcripts:
+            if t.language_code == "en":
 
-            # Prefer manually created transcripts when available
-            if not t.is_generated:
-                transcript = t.fetch()
-                break
+                # Prefer manually created transcripts when available
+                if not t.is_generated:
+                    transcript = t.fetch()
+                    break
 
-            # Use auto-generated transcript only as fallback
-            if transcript is None:
-                transcript = t.fetch()
+                # Use auto-generated transcript only as fallback
+                if transcript is None:
+                    transcript = t.fetch()
+    except Exception:
+        return None
 
     return transcript if transcript else None
 

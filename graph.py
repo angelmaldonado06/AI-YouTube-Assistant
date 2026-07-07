@@ -53,8 +53,6 @@ def create_initial_state(query: str, video_url: str, processed_transcript: str, 
         has_empty_context=False
     )
 
-
-
 def retrieve_node(state: RAGState) -> RAGState:
     """Retrieve relevant transcript chunks based on query."""
 
@@ -156,7 +154,7 @@ def generation_node(state: RAGState) -> RAGState:
     return state
 
 def reflection_node(state:RAGState) -> RAGState:
-    '''Critique own output and revise it'''
+    '''Critique output and revise it'''
     judge = get_eval_llm()
     prompt = create_eval_prompt()
     chain = prompt | judge

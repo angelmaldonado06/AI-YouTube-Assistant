@@ -1,14 +1,11 @@
 from typing import TypedDict, Optional, List
 import json
-import logging
 from rag_pipeline import retrieve_context, get_reranker
 from prompts import create_answer_prompt, create_revision_prompt, create_eval_prompt
 from llms import get_llm, get_eval_llm
 from langgraph.graph import StateGraph, END, START
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-
-logger = logging.getLogger(__name__)
 
 
 class RAGState(TypedDict):
@@ -70,13 +67,13 @@ def rerank_node(state: RAGState) ->RAGState:
 
     ranked_docs = [doc for score, doc in sorted(zip(scores, documents), key=lambda x: -x[0])][:4]
 
-    logger.debug(f"\n{'='*70}")
-    logger.debug(f"RERANKING RESULTS")
-    logger.debug(f"{'='*70}")
+    print(f"\n{'='*70}")
+    print(f"RERANKING RESULTS")
+    print(f"{'='*70}")
     for i, (score, doc) in enumerate(sorted(zip(scores, documents), key=lambda x: -x[0])[:4], 1):
-        logger.debug(f"Rank {i} (score: {score:.4f})")
-        logger.debug(f"  {doc.page_content[:100]}...")
-    logger.debug(f"{'='*70}\n")
+        print(f"Rank {i} (score: {score:.4f})")
+        print(f"  {doc.page_content[:100]}...")
+    print(f"{'='*70}\n")
     
     context = "\n\n".join([f"{doc.page_content} (Timestamp: {doc.metadata.get('timestamp', 'N/A')})" for doc in ranked_docs])
 
@@ -129,9 +126,9 @@ def critique_node(state:RAGState) -> RAGState:
         decision = parsed.get("decision", "Fail")
         feedback = parsed.get("feedback", "")
 
-        logger.debug(f"  Score: {score}")
-        logger.debug(f"  Decision: {decision}")
-        logger.debug(f"  Feedback: {feedback}")
+        print(f"  Score: {score}")
+        print(f"  Decision: {decision}")
+        print(f"  Feedback: {feedback}")
 
         state['reflection_feedback'] = feedback
         state['reflection_decision'] = decision
@@ -139,13 +136,13 @@ def critique_node(state:RAGState) -> RAGState:
         state['attempt_count'] += 1
 
     except json.JSONDecodeError as e:
-        logger.debug(f"JSON Parse Error: {e}")
-        logger.debug("Evaluation failed. Keeping current answer instead of looping forever.")
+        print(f"JSON Parse Error: {e}")
+        print("Evaluation failed. Keeping current answer instead of looping forever.")
         state['reflection_feedback'] = "Evaluator returned invalid JSON."
         state['reflection_decision'] = "PASS"
         state['eval_score'] = 7
         state['attempt_count'] += 1
-        logger.debug(f"{'='*70}\n")
+        print(f"{'='*70}\n")
     return state
 
 def output_node(state: RAGState) -> RAGState:

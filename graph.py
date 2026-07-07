@@ -20,8 +20,8 @@ class RAGState(TypedDict):
     conversation_history: List[BaseMessage]
     attempt_count: int
     eval_score: float
-    reflection_feedback: str
-    reflection_decision: str
+    critique_feedback: str
+    critique_decision: str
     time_range: Optional[dict]
 
 # TODO: Upgrade 7 — refactor this to a class-based Router with Pydantic BaseModel
@@ -38,8 +38,8 @@ def create_initial_state(query: str, faiss_index, conversation_history: List[Bas
         conversation_history=conversation_history,
         attempt_count=0,
         eval_score=0.0,
-        reflection_feedback="",
-        reflection_decision="",
+        critique_feedback="",
+        critique_decision="",
         time_range=time_range
     )
 
@@ -59,6 +59,10 @@ def retrieve_node(state: RAGState) -> RAGState:
 def rerank_node(state: RAGState) ->RAGState:
     '''Re-rank retrieved documents by relevance using cross-encoder.''' 
     documents = state["retrieved_documents"]
+    if not documents:
+        state["retrieved_context"] = ""
+        return state
+
     question = state["query"]
     ranker = get_reranker()
 
@@ -86,13 +90,13 @@ def generation_node(state: RAGState) -> RAGState:
     """Generate or revise answer using LLM with retrieved context."""
     llm = get_llm()
 
-    if state['attempt_count'] > 0 and state.get('reflection_feedback'):
+    if state['attempt_count'] > 0 and state.get('critique_feedback'):
         prompt = create_revision_prompt()
         inputs = {
             "context": state['retrieved_context'],
             "question": state['query'],
             "previous_answer": state['final_answer'],
-            "feedback": state['reflection_feedback'],
+            "feedback": state['critique_feedback'],
         }
     else:
         prompt = create_answer_prompt()
@@ -130,16 +134,16 @@ def critique_node(state:RAGState) -> RAGState:
         print(f"  Decision: {decision}")
         print(f"  Feedback: {feedback}")
 
-        state['reflection_feedback'] = feedback
-        state['reflection_decision'] = decision
+        state['critique_feedback'] = feedback
+        state['critique_decision'] = decision
         state['eval_score'] = score
         state['attempt_count'] += 1
 
     except json.JSONDecodeError as e:
         print(f"JSON Parse Error: {e}")
         print("Evaluation failed. Keeping current answer instead of looping forever.")
-        state['reflection_feedback'] = "Evaluator returned invalid JSON."
-        state['reflection_decision'] = "PASS"
+        state['critique_feedback'] = "Evaluator returned invalid JSON."
+        state['critique_decision'] = "PASS"
         state['eval_score'] = 7
         state['attempt_count'] += 1
         print(f"{'='*70}\n")
@@ -169,10 +173,10 @@ graph_builder.add_node("output", output_node)
 graph_builder.add_edge(START, "retrieve")
 
 def should_regenerate(state):
-    reflection_decision = state["reflection_decision"].lower()
+    critique_decision = state["critique_decision"].lower()
     needs_regen = (
         state["eval_score"] < 7
-        or reflection_decision in {"needs_improvement", "fail"}
+        or critique_decision in {"needs_improvement", "fail"}
     )
 
     if needs_regen and state['attempt_count'] < 3:

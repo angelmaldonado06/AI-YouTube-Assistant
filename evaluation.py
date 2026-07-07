@@ -15,7 +15,7 @@ from ragas.metrics import (
     faithfulness,
 )
 
-from prompts import create_qa_chain, create_qa_prompt_template
+from prompts import create_answer_prompt
 from rag_pipeline import (
     create_embedding_model,
     prepare_video,
@@ -55,6 +55,7 @@ def generate_answer(question, vectorstore, qa_chain, retrieval_k) -> tuple[str, 
         {
             "context": context,
             "question": question,
+            "conversation_history": [],
         }
     )
 
@@ -68,8 +69,8 @@ def build_eval_rows(video_url, eval_questions, retrieval_k=4) -> list[dict]:
         raise ValueError("Could not prepare the video transcript for evaluation.")
 
     qa_llm = get_eval_llm()
-    qa_prompt = create_qa_prompt_template()
-    qa_chain = create_qa_chain(qa_llm, qa_prompt, verbose=False)
+    qa_prompt = create_answer_prompt()
+    qa_chain = qa_prompt | qa_llm
 
     rows = []
 

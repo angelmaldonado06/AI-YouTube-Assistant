@@ -111,6 +111,11 @@ def generation_node(state: RAGState) -> RAGState:
 
     return state
 
+def no_context_node(state: RAGState) -> RAGState:
+    """Return a clear answer when retrieval found no usable context."""
+    state["final_answer"] = "I could not find relevant transcript context for that question."
+    return state
+
 def critique_node(state:RAGState) -> RAGState:
     '''Evaluate output using external evaluator and decide if it needs revision'''
     evaluator = get_eval_llm()
@@ -166,6 +171,7 @@ graph_builder = StateGraph(RAGState)
 graph_builder.add_node("retrieve", retrieve_node)
 graph_builder.add_node("rerank", rerank_node)
 graph_builder.add_node("generate", generation_node)
+graph_builder.add_node("no_context", no_context_node)
 graph_builder.add_node("critique", critique_node)
 graph_builder.add_node("output", output_node)
 
@@ -188,9 +194,16 @@ graph_builder.add_conditional_edges("critique", should_regenerate, {
     "output":"output"
 })
 
+def has_context(state):
+    return "generate" if state["retrieved_context"].strip() else "no_context"
+
 graph_builder.add_edge("retrieve", "rerank")
-graph_builder.add_edge("rerank", "generate")
+graph_builder.add_conditional_edges("rerank", has_context, {
+    "generate": "generate",
+    "no_context": "no_context",
+})
 graph_builder.add_edge("generate", "critique")
+graph_builder.add_edge("no_context", "output")
 graph_builder.add_edge("output", END)
 
 # Compile the graph

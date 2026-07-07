@@ -1,4 +1,4 @@
-from langchain_core.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate, ChatPromptTemplate, MessagesPlaceholder
 
 def create_summary_prompt() -> PromptTemplate:
     """Create prompt template for video summarization."""
@@ -27,60 +27,77 @@ def create_summary_prompt() -> PromptTemplate:
     return prompt
 
 
-def create_qa_prompt() -> PromptTemplate:
-    """Create prompt template for context-grounded question answering."""
-    qa_template = """
-    You are an expert assistant providing answers based on video content.
+def create_answer_prompt() -> ChatPromptTemplate:
+    """Create chat prompt template for answering a question from video context."""
+    return ChatPromptTemplate.from_messages([
+        ("system", 
+        """You are an expert assistant providing answers based on video content.
 
-    ANSWER PRIORITY:
-    1. First, check the provided video context.
-    2. If the answer is in the context:
-        - Extract the ACTUAL DEFINITION or explanation using wording as close as possible to the transcript
-        - Include any examples given by the speaker
-        - DEDUPLICATE: Mention each concept only once
-        - Use ONLY ONE timestamp (the earliest or most relevant)
-    3. If NOT in the context:
-        - Say: "The video does not mention this."
-    4. THEN, only if highly confident, add:
-        - "However, [general knowledge answer]"
-    5. NEVER fabricate timestamps or claim something is in the video when it is not.
+        ANSWER PRIORITY:
+        1. First, check the provided video context.
+        2. If the answer is in the context:
+            - Extract the ACTUAL DEFINITION or explanation using wording as close as possible to the transcript
+            - Include any examples given by the speaker
+            - DEDUPLICATE: Mention each concept only once
+            - Use ONLY ONE timestamp (the earliest or most relevant)
+        3. If NOT in the context:
+            - Say: "The video does not mention this."
+        4. THEN, only if highly confident, add:
+            - "However, [general knowledge answer]"
+        5. NEVER fabricate timestamps or claim something is in the video when it is not.
 
-    EDGE CASES:
-    - If multiple conflicting explanations exist, choose the clearest one and use the earliest timestamp.
+        EDGE CASES:
+            - If multiple conflicting explanations exist, choose the clearest one and use the earliest timestamp.
 
-    REVISION MODE:
-    If feedback is provided:
-    - Improve the answer accordingly
-    - Keep correct parts
-    - Fix issues
-    - Do NOT mention revision or feedback
+        Your responses should be:
+            - Specific and detailed (extract actual definitions and examples from context)
+            - Clear and concise
+            - Focused solely on answering the user's question
 
-    Your responses should be:
-    - Specific and detailed (extract actual definitions and examples from context)
-    - Clear and concise
-    - Focused solely on answering the user's question
-    - Free from mentioning internal mechanics (history, feedback, revision process, etc.)
+        Note: In the transcript, "Text" refers to the spoken words in the video, "Timestamp" indicates when that part begins in the video."""),
 
-    Note: In the transcript, "Text" refers to the spoken words in the video, "Timestamp" indicates when that part begins in the video.
+        MessagesPlaceholder(variable_name="conversation_history"),
+        
+        ("user", """VIDEO CONTEXT:
+        ============================================
+        {context}
+        ============================================
 
-    ============================================
+        QUESTION: {question}
+
+        ANSWER:"""),
+        ])
+
+
+def create_revision_prompt() -> PromptTemplate:
+    """Create prompt template for revising an answer based on evaluator feedback."""
+    template = """
+    You are revising an answer to a question about a YouTube video.
+
+    Use only the provided video context.
+    Do not mention that you are revising.
+    Do not mention evaluator feedback.
+    Do not fabricate timestamps.
+
     VIDEO CONTEXT:
     {context}
-    ============================================
-    if necessary, use the conversation history: {conversation_history}
-    
-    {feedback_guidance}
 
-    QUESTION: {question}
+    QUESTION:
+    {question}
 
-    ANSWER (extract the actual definition/explanation and examples from context if available):
+    PREVIOUS ANSWER:
+    {previous_answer}
+
+    EVALUATOR FEEDBACK:
+    {feedback}
+
+    REVISED ANSWER:
     """
 
-    prompt_template = PromptTemplate(
-        input_variables=["context", "question", "conversation_history","feedback_guidance"],
-        template=qa_template
+    return PromptTemplate(
+        input_variables=["context", "question", "previous_answer", "feedback"],
+        template=template,
     )
-    return prompt_template
 
 
 def create_queries_prompt() -> PromptTemplate:

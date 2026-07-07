@@ -1,4 +1,5 @@
 import gradio as gr
+import logging
 from rag_pipeline import prepare_video
 from llms import get_llm
 from prompts import (
@@ -6,13 +7,26 @@ from prompts import (
 )
 from graph import create_initial_state, rag_graph
 
+# Configure logging to see debug output in terminal
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(name)s - %(levelname)s - %(message)s'
+)
+
 processed_transcript = ""
 faiss_index = None
 conversation_history = []
+current_video_url = None
 
 def summarize_video(video_url) -> str:
     """Fetch video transcript and generate a concise summary."""
-    global processed_transcript, faiss_index
+    global processed_transcript, faiss_index, conversation_history, current_video_url
+
+    if current_video_url != video_url:
+        processed_transcript = ""
+        faiss_index = None
+        conversation_history = []
+        current_video_url = video_url
 
     processed_transcript, faiss_index = prepare_video(video_url)
     
@@ -31,7 +45,13 @@ def summarize_video(video_url) -> str:
 
 def answer_question(video_url, question, from_min=None, to_min=None) -> str:
     """Answer a question based on video transcript using the RAG graph."""
-    global processed_transcript, faiss_index, conversation_history
+    global processed_transcript, faiss_index, conversation_history, current_video_url
+
+    if current_video_url != video_url:
+        processed_transcript = ""
+        faiss_index = None
+        conversation_history = []
+        current_video_url = video_url
 
     time_range = None
     if from_min is not None and to_min is not None and from_min >= 0 and to_min > 0:
@@ -46,11 +66,9 @@ def answer_question(video_url, question, from_min=None, to_min=None) -> str:
     if processed_transcript and question:
         state = create_initial_state(
             query=question,
-            video_url=video_url,
-            processed_transcript=processed_transcript,
             faiss_index=faiss_index,
             conversation_history=conversation_history,
-            time_range = time_range
+            time_range=time_range
         )
 
         result = rag_graph.invoke(state)

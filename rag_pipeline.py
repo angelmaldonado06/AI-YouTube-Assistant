@@ -3,10 +3,13 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from sentence_transformers import CrossEncoder
-from typing import List
+from typing import List, Optional, Tuple
 from prompts import create_queries_prompt
 import json
+import logging
 from llms import get_llm
+
+logger = logging.getLogger(__name__)
 from transcript import (
     format_transcript_entries,
     get_transcript,
@@ -82,9 +85,9 @@ def generate_rephrased_queries(question: str) -> List:
 
     response = chain.invoke({"question": question})
 
-    print(f"MULTI-QUERY")
-    print(f"{'='*70}")
-    print(f"LLM Response: {response}")
+    logger.debug(f"MULTI-QUERY")
+    logger.debug(f"{'='*70}")
+    logger.debug(f"LLM Response: {response}")
 
     try:
         parsed = json.loads(response)
@@ -98,6 +101,54 @@ def generate_rephrased_queries(question: str) -> List:
     except json.JSONDecodeError as e:
         print(f"Error parsing queries: {e}")
         return []
+
+
+def retrieve_context(query: str, faiss_index, time_range: Optional[dict] = None) -> Tuple[str, List[Document]]:
+    """
+    Retrieve and process documents for a query.
+    Handles: multi-query expansion, deduplication, time filtering, context formatting.
+    Returns: (formatted_context, retrieved_documents)
+    """
+    # Multi-query expansion
+    queries = [query]
+    rephrased = generate_rephrased_queries(query)
+    queries.extend(rephrased)
+
+    # Search FAISS with each query
+    all_docs = []
+    for q in queries:
+        docs = retrieve_documents(q, faiss_index)
+        all_docs.extend(docs)
+
+    # Deduplicate
+    seen = set()
+    unique_docs = []
+    for doc in all_docs:
+        if doc.page_content not in seen:
+            seen.add(doc.page_content)
+            unique_docs.append(doc)
+
+    # Time range filtering
+    if time_range:
+        start = time_range['start_seconds']
+        end = time_range['end_seconds']
+
+        logger.debug(f"\nFILTERING BY TIME RANGE: {start} - {end} seconds")
+        logger.debug(f"Docs before filter: {len(unique_docs)}")
+
+        for doc in unique_docs[:3]:
+            logger.debug(f"  Doc start: {doc.metadata.get('start_seconds')} - {doc.page_content[:60]}...")
+
+        unique_docs = [doc for doc in unique_docs if start <= doc.metadata['start_seconds'] <= end]
+        logger.debug(f"Docs after filter: {len(unique_docs)}")
+    else:
+        logger.debug("Time range None")
+
+    # Format context
+    context = "\n\n".join([f"{doc.page_content} (Timestamp: {doc.metadata.get('timestamp', 'N/A')})" for doc in unique_docs])
+
+    return context, unique_docs
+
 
 def get_reranker() -> CrossEncoder:
     """Create or return cached CrossEncoder model for reranking."""

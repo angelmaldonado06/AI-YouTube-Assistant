@@ -117,7 +117,7 @@ def retrieve_context(query: str, faiss_index, time_range: Optional[dict] = None)
         docs = retrieve_documents(q, faiss_index)
         all_docs.extend(docs)
 
-    # Deduplicate
+    # deduplicate
     seen = set()
     unique_docs = []
     for doc in all_docs:
@@ -125,7 +125,7 @@ def retrieve_context(query: str, faiss_index, time_range: Optional[dict] = None)
             seen.add(doc.page_content)
             unique_docs.append(doc)
 
-    # Time range filtering
+    #time range filtering
     if time_range:
         start = time_range['start_seconds']
         end = time_range['end_seconds']

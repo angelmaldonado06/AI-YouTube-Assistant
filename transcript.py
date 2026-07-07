@@ -17,10 +17,13 @@ def get_video_id(url) -> str | None:
 def get_transcript(url) -> list | None:
     """Fetch transcript entries from YouTube video URL."""
     video_id = get_video_id(url)
+    if video_id is None:
+        return None
+
     ytt_api = YouTubeTranscriptApi()
 
     transcripts = ytt_api.list(video_id)
-    transcript = ""
+    transcript = None
     for t in transcripts:
         if t.language_code == "en":
 
@@ -30,7 +33,7 @@ def get_transcript(url) -> list | None:
                 break
 
             # Use auto-generated transcript only as fallback
-            if len(transcript) == 0:
+            if transcript is None:
                 transcript = t.fetch()
 
     return transcript if transcript else None

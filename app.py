@@ -1,15 +1,38 @@
 import gradio as gr
 from rag_pipeline import prepare_video
 from llms import get_llm
-from prompts import (
-    create_summary_prompt
-)
+from prompts import create_summary_prompt
 from graph import create_initial_state, rag_graph
 
 processed_transcript = ""
 faiss_index = None
 conversation_history = []
 current_video_url = None
+
+NON_VIDEO_MESSAGES = {
+    "hi",
+    "hello",
+    "hey",
+    "how are you",
+    "thanks",
+    "thank you",
+    "what's up",
+    "whats up",
+}
+
+
+def is_non_video_message(question: str) -> bool:
+    """return True when the message should not enter the RAG graph."""
+    normalized = question.lower().strip(" .!?")
+    return normalized in NON_VIDEO_MESSAGES
+
+
+def answer_without_retrieval(question: str) -> str:
+    """Handle simple messages that are not questions about the video."""
+    if not question.strip():
+        return "Ask me a question about the video."
+
+    return "Hi! Ask me a question about the video, and I’ll answer using the video."
 
 def summarize_video(video_url) -> str:
     """Fetch video transcript and generate a concise summary."""
@@ -39,6 +62,10 @@ def summarize_video(video_url) -> str:
 def answer_question(video_url, question, from_min=None, to_min=None) -> str:
     """Answer a question based on video transcript using the RAG graph."""
     global processed_transcript, faiss_index, conversation_history, current_video_url
+
+    question = question or ""
+    if not question.strip() or is_non_video_message(question):
+        return answer_without_retrieval(question)
 
     if current_video_url != video_url:
         processed_transcript = ""

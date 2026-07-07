@@ -11,11 +11,11 @@ This project retrieves a video's transcript, splits it into chunks, embeds those
 - Generate concise summaries of YouTube videos
 - Ask questions about a video and get transcript-grounded answers
 - Preserve timestamps in retrieved transcript chunks
-- Route questions through a LangGraph RAG workflow
+- Run questions through a LangGraph RAG workflow
 - Improve recall with multi-query retrieval
 - Re-rank retrieved chunks before generation
 - Use conversation memory for follow-up questions
-- Reflect on generated answers and revise when needed
+- Critique generated answers and revise when needed
 - Evaluate the RAG pipeline with RAGAS
 
 ## How It Works
@@ -33,7 +33,7 @@ This project retrieves a video's transcript, splits it into chunks, embeds those
               ↓
       FAISS Vector Search
               ↓
-   LangGraph Router / Retrieval
+   LangGraph Retrieval Workflow
               ↓
         LLM (Llama 3.1)
               ↓
@@ -45,7 +45,7 @@ This project retrieves a video's transcript, splits it into chunks, embeds those
 ### Tech Stack
 
 - LangChain for prompt orchestration and chaining
-- LangGraph for routing, memory, and reflection flow
+- LangGraph for the question-answering workflow, memory, and critique loop
 - FAISS for vector search
 - Ollama for local model serving
 - Llama 3.1 for generation

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI YouTube Assistant</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <!--NAVBAR-->
+    <nav id="navbar">
+        <div id="brand">
+            <i class="bi bi-youtube"></i>
+            <span id="brand-name">AI YouTube Assistant</span>
+        </div>
+        <div id="nav-right">
+            <button id="back-btn" class="hidden">← New video</button>
+        </div>
+    </nav>
+
+    <!--FRIST SCREEN-->
+    <div id="screen-landing">
+        
+        <section id = "hero">
+            <h1>Ask anything about any <span id="hero-highlight">Youtube video</span></h1>
+            <p id="hero-sub">Paste a URL, and ask a question. The AI assistant will do its best to give you the answer you're looking for!</p>
+        </section>
+
+        <section id="url-section">
+            <div id="url-card">
+                <p class="section-label">Youtube Video URL</p>
+                <div id="url-row">
+                    <input type="text" id="url-input" placeholder="https://youtube.com/watch?v=..." autocomplete="off">
+                    <button id="load-btn">
+                        <i class="bi bi-play-circle-fill"></i> Load video
+                    </button>
+                </div>
+                <p id="url-hint">Press Enter or click Load video to continue</p>
+            </div>
+
+        </section>
+    </div>
+
+    <!--SECOND SCREEN-->
+    <div id="screen-chat" class="hidden">
+
+        <div id="video-strip">
+            <i class="bi bi-check-circle-fill"></i>
+            <strong id="strip-title">Video loaded</strong>
+            <span id="strip-meta"></span>
+        </div>
+
+        <div id="main-layout">
+
+
+            <div id="chat-card">
+
+                <div id="chat-header">
+                    <span id="chat-tittle">Conversation</span>
+                    <span id="turn-counter">0 turns</span>
+                    <button id="clear-btn">Clear</button>
+                </div>
+
+                <div id="chat-messages">
+                    <div id="empty-chat">
+                        <p id="empty-title">Ready to answer</p>
+                        <p>Ask anything about this video below</p>
+                    </div>
+                </div>
+
+                <div id="filter-bar">
+                    <span class="filter-label">Timestamp filter</span>
+                    <input type="number" id="from-min" placeholder="From" min="0" step="0.5">
+                    <span>→</span>
+                    <input type="number" id="to-min" placeholder="To" min="0" step="0.5">
+                    <span class="filter-hint">min (optional)</span>
+                </div>
+
+                <div id="chat-input-row">
+                    <textarea id="chat-input" rows="1" placeholder="Ask a question about this video..."></textarea>
+                    <button id="send-btn" title="send-message">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
+
+            </div>
+
+
+            <div id="sidebar">
+
+                <div class="side-card">
+                    <div class="side-card-header">
+                        <i class="bi bi-file-text"></i> Summary
+                    </div>
+                    <div class="side-card-body">
+                        <p id="summary-content">Load a video to see its summary</p>
+                    </div>
+                </div>
+
+                <div class="side-card">
+                    <div class="side-card-header">
+                        <i class="bi bi-bar-chart"></i>Last query
+                    </div>
+                    <div class="side-card-body">
+                        <div id="stat-grid">
+                            <div class="stat-box">
+                                <p class="stat-label">Router</p>
+                                <p class="stat-val" id="stat-router"></p>
+                            </div>
+                            <div class="stat-box">
+                                <p class="stat-label">Chunks</p>
+                                <p class="stat-val" id="stat-chunks"></p>
+                            </div>
+                            <div class="stat-box">
+                                <p class="stat-label">Eval-score</p>
+                                <p class="stat-val" id="stat-score"></p>
+                            </div>
+                            <div class="stat-box">
+                                <p class="stat-label">Attempts</p>
+                                <p class="stat-val" id="stat-attempts"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="side-card">
+                    <div class="side-card-header">
+                        <i class="bi bi-diagram-3"></i> Pipeline
+                    </div>
+                    <div class="side-card-body">
+                        <div id="pipeline">
+                            <div class="pipe-step">
+                                <div class="pipe-dot" id="p0"><i class="bi bi-arrow-right-circle"></i></div>
+                                <span class="pipe-name" id="p0l">Router</span>
+                            </div>
+                            <div class="pipe-step">
+                                <div class="pipe-dot" id="p1"><i class="bi bi-search"></i></div>
+                                <span class="pipe-name" id="p1l">Multi-query retrieve</span>
+                            </div>
+                            <div class="pipe-step">
+                                <div class="pipe-dot" id="p2"><i class="bi bi-sort-down"></i></div>
+                                <span class="pipe-name" id="p2l">Re-rank</span>
+                            </div>
+                            <div class="pipe-step">
+                                <div class="pipe-dot" id="p3"><i class="bi bi-cpu"></i></div>
+                                <span class="pipe-name" id="p3l">Generate</span>
+                            </div>
+                            <div class="pipe-step">
+                                <div class="pipe-dot" id="p4"><i class="bi bi-patch-check"></i></div>
+                                <span class="pipe-name" id="p4l">Critic</span>
+                            </div>
+                            <div class="pipe-step">
+                                <div class="pipe-dot" id="p5"><i class="bi bi-check2-all"></i></div>
+                                <span class="pipe-name" id="p5l">Output</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+
+
+        </div>
+
+        <footer>
+            Built by Angel Maldonado
+        </footer>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

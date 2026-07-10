@@ -107,6 +107,19 @@ def generation_node(state: RAGState) -> RAGState:
         }
 
     answer = (prompt | llm).invoke(inputs)
+
+    prefixes = [
+        "here is the revised answer:",
+        "here's the revised answer:",
+        "here is my revised answer:",
+        "revised answer:",
+    ]
+    answer_lower = answer.lower().lstrip()
+    for prefix in prefixes:
+        if answer_lower.startswith(prefix):
+            answer = answer[answer.lower().index(prefix) + len(prefix):].strip()
+            break
+
     state['final_answer'] = answer
 
     return state

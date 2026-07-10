@@ -57,7 +57,6 @@
 
         <div id="main-layout">
 
-
             <div id="chat-card">
 
                 <div id="chat-header">
@@ -90,8 +89,7 @@
 
             </div>
 
-
-            <div id="sidebar">
+            <div id="sidebar-right">
 
                 <div class="side-card">
                     <div class="side-card-header">
@@ -102,65 +100,7 @@
                     </div>
                 </div>
 
-                <div class="side-card">
-                    <div class="side-card-header">
-                        <i class="bi bi-bar-chart"></i>Last query
-                    </div>
-                    <div class="side-card-body">
-                        <div id="stat-grid">
-                            <div class="stat-box">
-                                <p class="stat-label">Decision</p>
-                                <p class="stat-val" id="stat-decision">—</p>
-                            </div>
-                            <div class="stat-box">
-                                <p class="stat-label">Chunks</p>
-                                <p class="stat-val" id="stat-chunks">—</p>
-                            </div>
-                            <div class="stat-box">
-                                <p class="stat-label">Eval-score</p>
-                                <p class="stat-val" id="stat-score">—</p>
-                            </div>
-                            <div class="stat-box">
-                                <p class="stat-label">Attempts</p>
-                                <p class="stat-val" id="stat-attempts">—</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="side-card">
-                    <div class="side-card-header">
-                        <i class="bi bi-diagram-3"></i> Pipeline
-                    </div>
-                    <div class="side-card-body">
-                        <div id="pipeline">
-                            <div class="pipe-step">
-                                <div class="pipe-dot" id="p0"><i class="bi bi-search"></i></div>
-                                <span class="pipe-name" id="p0l">Retrieve</span>
-                            </div>
-                            <div class="pipe-step">
-                                <div class="pipe-dot" id="p1"><i class="bi bi-sort-down"></i></div>
-                                <span class="pipe-name" id="p1l">Re-rank</span>
-                            </div>
-                            <div class="pipe-step">
-                                <div class="pipe-dot" id="p2"><i class="bi bi-cpu"></i></div>
-                                <span class="pipe-name" id="p2l">Generate</span>
-                            </div>
-                            <div class="pipe-step">
-                                <div class="pipe-dot" id="p3"><i class="bi bi-patch-check"></i></div>
-                                <span class="pipe-name" id="p3l">Critic</span>
-                            </div>
-                            <div class="pipe-step">
-                                <div class="pipe-dot" id="p4"><i class="bi bi-check2-all"></i></div>
-                                <span class="pipe-name" id="p4l">Output</span>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
             </div>
-
 
         </div>
 

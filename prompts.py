@@ -9,6 +9,7 @@ def create_summary_prompt() -> PromptTemplate:
     1. Summarize the transcript in a single concise paragraph.
     2. Ignore any timestamps in your summary.
     3. Focus on the spoken content (Text) of the video.
+    4. Always start with "The video discusses..."
 
     Note: In the transcript, "Text" refers to the spoken words in the video, and "Timestamp" indicates the timestamp when that part begins in the video.
     Please summarize the following YouTube video transcript:

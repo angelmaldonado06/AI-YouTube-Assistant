@@ -41,8 +41,10 @@ def answer_without_retrieval(question: str) -> str:
         return "I don’t have a personal name, but I’m your Personal AI YouTube Assistant. I help summarize videos and answer questions using the video transcript."
     if normalized in {"bye", "goodbye"}:
         return "Goodbye! Come back anytime with another question about the video."
+    if normalized in {"hi", "hello", "hey"}:
+        return "Hi! How are you doing today?"
 
-    return "Hi! Ask me a question about the video, and I’ll answer using the video."
+    return "Hi! Ask me any questions you have about the YouTube video."
 
 def summarize_video(video_url) -> str:
     """Fetch video transcript and generate a concise summary."""

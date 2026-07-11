@@ -14,7 +14,7 @@ from ragas.metrics import (
     context_recall,
     faithfulness,
 )
-
+from langchain_core.output_parsers import StrOutputParser
 from prompts import create_answer_prompt
 from rag_pipeline import (
     create_embedding_model,
@@ -70,7 +70,7 @@ def build_eval_rows(video_url, eval_questions, retrieval_k=4) -> list[dict]:
 
     qa_llm = get_eval_llm()
     qa_prompt = create_answer_prompt()
-    qa_chain = qa_prompt | qa_llm
+    qa_chain = qa_prompt | qa_llm | StrOutputParser()
 
     rows = []
 

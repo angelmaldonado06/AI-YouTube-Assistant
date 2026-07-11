@@ -1,7 +1,7 @@
 from typing import TypedDict, Optional, List
 import json
 from rag_pipeline import retrieve_context, get_reranker
-from prompts import create_answer_prompt, create_revision_prompt, create_eval_prompt, create_router_prompt
+from prompts import create_answer_prompt, create_revision_prompt, create_eval_prompt, create_router_prompt, create_chat_prompt
 from llms import get_llm, get_eval_llm
 from langgraph.graph import StateGraph, END, START
 from langchain_core.documents import Document
@@ -47,7 +47,12 @@ def router_node(state: RAGState) -> dict:
     llm = get_llm()
     router_prompt = create_router_prompt()
     router_chain = router_prompt | llm | StrOutputParser()
-    response = router_chain.invoke({"question": state['query']})
+
+    history_text = "\n".join(
+        f"{'User' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}"
+        for msg in state["conversation_history"]
+    )
+    response = router_chain.invoke({"question": state['query'], "conversation_history": history_text})
 
     print(f"\n{'='*70}")
     print(f"Query: {state['query']}")
@@ -135,6 +140,13 @@ def generation_node(state: RAGState) -> RAGState:
             "question": state['query'],
             "previous_answer": state['final_answer'],
             "feedback": state['critique_feedback'],
+            "needs_transcript": state['routing_decision'],
+        }
+    elif state['routing_decision'] == 'generate':
+        prompt = create_chat_prompt()
+        inputs = {
+            "question": state['query'],
+            "conversation_history": state['conversation_history'],
         }
     else:
         prompt = create_answer_prompt()
@@ -165,6 +177,7 @@ def reflection_node(state:RAGState) -> RAGState:
         'context': state["retrieved_context"],
         'question': state["query"],
         'answer': state["final_answer"],
+        'needs_transcript': state["routing_decision"],
     })
 
     try:

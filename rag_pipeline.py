@@ -7,19 +7,31 @@ from typing import List, Optional, Tuple
 from prompts import create_queries_prompt
 import json
 from llms import get_llm
+from langchain_core.output_parsers import StrOutputParser
 from transcript import (
     format_transcript_entries,
     get_transcript,
+    get_video_id,
     normalize_transcript_entries,
 )
+from helpers import is_cached, save_to_cache, load_from_cache
 
 _reranker_cache = None
 
 # MAIN ENTRY POINT: Orchestrates the full ingestion + indexing pipeline
 def prepare_video(video_url) -> tuple[str, FAISS | None]:
-    """Fetch video transcript and build FAISS index."""
+    """Fetch video transcript and build FAISS index, using a disk cache when available."""
     if not video_url:
         return "", None
+
+    video_id = get_video_id(video_url)
+    if not video_id:
+        return "", None
+
+    embedding_model = create_embedding_model()
+
+    if is_cached(video_id):
+        return load_from_cache(video_id, embedding_model)
 
     fetched_transcript = get_transcript(video_url)
     if not fetched_transcript:
@@ -28,11 +40,12 @@ def prepare_video(video_url) -> tuple[str, FAISS | None]:
     transcript_entries = normalize_transcript_entries(fetched_transcript)
     processed_transcript = format_transcript_entries(transcript_entries)
     transcript_documents = build_transcript_documents(transcript_entries)
-    embedding_model = create_embedding_model()
     faiss_index = create_faiss_index_from_documents(
         transcript_documents,
         embedding_model,
     )
+
+    save_to_cache(video_id, processed_transcript, faiss_index)
 
     return processed_transcript, faiss_index
 
@@ -74,13 +87,13 @@ def retrieve_documents(query, faiss_index, k=10) -> list:
     return faiss_index.similarity_search(query, k=k)
 
 
-def generate_rephrased_queries(question: str) -> List:
+def generate_rephrased_queries(query: str) -> List:
     """Generate 3 alternative phrasings of the question for multi-query retrieval."""
     llm = get_llm()
     prompt = create_queries_prompt()
-    chain = prompt | llm
+    chain = prompt | llm| StrOutputParser()
 
-    response = chain.invoke({"question": question})
+    response = chain.invoke({"query": query})
 
     print(f"MULTI-QUERY")
     print(f"{'='*70}")

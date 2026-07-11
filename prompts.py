@@ -41,8 +41,9 @@ def create_answer_prompt() -> ChatPromptTemplate:
             - Use ONLY ONE timestamp (the earliest or most relevant)
         3. If NOT in the context:
             - Say: "The video does not mention this."
-        4. THEN, only if highly confident, add:
+        4. THEN, only if you are certain the general knowledge answer is accurate, add:
             - "However, [general knowledge answer]"
+            - If you are not certain it is accurate, do not guess — omit this step entirely.
         5. NEVER fabricate timestamps or claim something is in the video when it is not.
 
 
@@ -65,11 +66,29 @@ def create_answer_prompt() -> ChatPromptTemplate:
         ANSWER:"""),
         ])
 
+def create_chat_prompt() -> ChatPromptTemplate:
+    """Create chat prompt template for questions that don't need the video transcript."""
+    return ChatPromptTemplate.from_messages([
+        ("system",
+        """You are a friendly AI assistant for a YouTube video Q&A tool.
+
+        This question does not require the video transcript (e.g. a greeting, small talk,
+        or a question about the conversation itself). Respond naturally and warmly using the
+        conversation history for context, and gently encourage the user to ask a question
+        about the video."""),
+
+        MessagesPlaceholder(variable_name="conversation_history"),
+
+        ("user", "{question}"),
+        ])
+
+
 def create_router_prompt() -> PromptTemplate:
     router_prompt = """
     You are a routing AI assistant. Decide if this question needs the video transcript.
 
     Question: {question}
+    Conversation history: {conversation_history}
 
     RESPOND WITH ONLY THIS JSON, NO EXPLANATION:
     {{
@@ -90,10 +109,12 @@ def create_router_prompt() -> PromptTemplate:
     - "What's the capital of France?" → {{"needs_transcript": false, "confidence": 0.9}}
     - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95}}
     - "Based on the video, what are hidden layers?" → {{"needs_transcript": true, "confidence": 0.95}}
+    - "What is the first message i sent you?" → {{"needs_transcript": false, "confidence": 0.9}}
+
     """
 
     prompt_template = PromptTemplate(
-        input_variables = ["question"],
+        input_variables = ["question", "conversation_history"],
         template = router_prompt
     )
 
@@ -104,10 +125,18 @@ def create_revision_prompt() -> PromptTemplate:
     template = """
     You are revising an answer to a question about a YouTube video.
 
-    Use only the provided video context.
+    This question was routed as: {needs_transcript}
+
+    If routed as "retrieve" (the question needed the video transcript):
+        - Use only the provided video context.
+        - Do not fabricate timestamps.
+    If routed as "generate" (the question did NOT need the video transcript - e.g. a greeting
+    or general-knowledge question):
+        - Ignore the video context entirely and do not reference it.
+        - Revise for tone, clarity, and engagement instead.
+
     Do not mention that you are revising.
     Do not mention evaluator feedback.
-    Do not fabricate timestamps.
 
     VIDEO CONTEXT:
     {context}
@@ -125,7 +154,7 @@ def create_revision_prompt() -> PromptTemplate:
     """
 
     return PromptTemplate(
-        input_variables=["context", "question", "previous_answer", "feedback"],
+        input_variables=["context", "question", "previous_answer", "feedback", "needs_transcript"],
         template=template,
     )
 
@@ -149,13 +178,21 @@ def create_queries_prompt() -> PromptTemplate:
 
 def create_eval_prompt()-> PromptTemplate:
     eval_prompt="""
-        You are an evaluator judging the quality of an AI response grounded in video content.
+        You are an evaluator judging the quality of an AI response about a YouTube video.
 
-        Evaluate based on:
+        This question was routed as: {needs_transcript}
+
+        If routed as "retrieve" (the question needed the video transcript), evaluate based on:
         1. Correctness (is it factually correct based on context?)
         2. Relevance (does it answer the question?)
         3. Completeness (is it sufficient?)
         4. Grounding (is the answer supported by the provided context?)
+
+        If routed as "generate" (the question did NOT need the video transcript - e.g. a greeting
+        or general-knowledge question), do NOT evaluate or penalize grounding. Instead evaluate:
+        1. Relevance (does it answer the question?)
+        2. Tone (is it friendly, engaging, and encouraging?)
+        3. Whether it invites the user to ask a video-related question next.
 
         Context: {context}
         Question: {question}
@@ -166,7 +203,7 @@ def create_eval_prompt()-> PromptTemplate:
     """
 
     prompt_template = PromptTemplate(
-        input_variables=["context", "question", "answer"],
+        input_variables=["context", "question", "answer", "needs_transcript"],
         template = eval_prompt
     )
     return prompt_template

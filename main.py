@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
-from app import summarize_video, answer_question
+from app import summarize_video, answer_question, clear_conversation
 
 app = FastAPI()
 app.add_middleware(
@@ -30,3 +30,8 @@ class AskRequest(BaseModel):
 def ask(body: AskRequest):
     answer = answer_question(body.video_url, body.question, body.from_min, body.to_min)
     return {"answer":answer}
+
+@app.post('/clear')
+def clear():
+    clear_conversation()
+    return {"status": "cleared"}

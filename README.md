@@ -22,26 +22,25 @@ This project retrieves a video's transcript, splits it into chunks, embeds those
 
 ### Pipeline
 
-```mermaid
-flowchart TD
-    URL([YouTube URL]) --> Transcript[Fetch transcript]
-    Transcript --> Chunk[Chunk + embed]
-    Chunk --> FAISS[(FAISS index)]
-
-    FAISS --> Router{Needs transcript?}
-    Router -- no --> Generate[Generate answer]
-    Router -- yes --> Retrieve[Multi-query retrieve]
-    Retrieve --> HasContext{Found context?}
-    HasContext -- no --> NoContext[No relevant context]
-    HasContext -- yes --> Rerank[Re-rank chunks]
-    Rerank --> Generate
-    Generate --> Judge{Judge: grounded & correct?}
-    Judge -- needs revision --> Generate
-    Judge -- pass / max attempts --> Answer([Final answer])
-    NoContext --> Answer
+```text
+          YouTube URL
+              ↓
+      Transcript Retrieval
+              ↓
+        Text Chunking
+              ↓
+         Embeddings
+              ↓
+      FAISS Vector Search
+              ↓
+   LangGraph Retrieval Workflow
+              ↓
+        LLM (GPT-4o-mini)
+              ↓
+   Reflect & Revise (↺ up to 3x)
+              ↓
+    Summary / Question Answering
 ```
-
-RAGAS evaluation (below) runs separately, offline against a fixed dataset — it's not part of the live request path above.
 
 ### Tech Stack
 

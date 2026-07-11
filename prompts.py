@@ -9,12 +9,10 @@ def create_summary_prompt() -> PromptTemplate:
     1. Summarize the transcript in a single concise paragraph.
     2. Ignore any timestamps in your summary.
     3. Focus on the spoken content (Text) of the video.
-    4. Always start with "The video discusses..."
 
     Note: In the transcript, "Text" refers to the spoken words in the video, and "Timestamp" indicates the timestamp when that part begins in the video.
-    Please summarize the following YouTube video transcript:
 
-    Video content:
+    VIDEO CONTEXT:
     {transcript}
 
     Summary:
@@ -32,12 +30,12 @@ def create_answer_prompt() -> ChatPromptTemplate:
     """Create chat prompt template for answering a question from video context."""
     return ChatPromptTemplate.from_messages([
         ("system", 
-        """You are an expert assistant providing answers based on video content.
+        """You are an AI assistant tasked with providing answers based on video content.
 
         ANSWER PRIORITY:
         1. First, check the provided video context.
         2. If the answer is in the context:
-            - Extract the ACTUAL DEFINITION or explanation using wording as close as possible to the transcript
+            - Extract the actual definition or explanation using wording as close as possible to the transcript
             - Include any examples given by the speaker
             - DEDUPLICATE: Mention each concept only once
             - Use ONLY ONE timestamp (the earliest or most relevant)
@@ -47,8 +45,6 @@ def create_answer_prompt() -> ChatPromptTemplate:
             - "However, [general knowledge answer]"
         5. NEVER fabricate timestamps or claim something is in the video when it is not.
 
-        EDGE CASES:
-            - If multiple conflicting explanations exist, choose the clearest one and use the earliest timestamp.
 
         Your responses should be:
             - Specific and detailed (extract actual definitions and examples from context)
@@ -69,6 +65,39 @@ def create_answer_prompt() -> ChatPromptTemplate:
         ANSWER:"""),
         ])
 
+def create_router_prompt() -> PromptTemplate:
+    router_prompt = """
+    You are a routing AI assistant. Decide if this question needs the video transcript.
+
+    Question: {question}
+
+    RESPOND WITH ONLY THIS JSON, NO EXPLANATION:
+    {{
+    "needs_transcript": true/false,
+    "confidence": 0.0-1.0
+    }}
+
+    Rules:
+    - needs_transcript=true if the question references the video/speaker/content, or asks
+      the assistant to summarize, explain, or recall something that was said.
+    - needs_transcript=false if the question is a greeting, small talk, or general-knowledge
+      question unrelated to the video.
+    - confidence: your confidence (0.0-1.0) in the needs_transcript decision.
+
+    Examples:
+    - "Hi" → {{"needs_transcript": false, "confidence": 0.95}}
+    - "What's up?" → {{"needs_transcript": false, "confidence": 0.9}}
+    - "What's the capital of France?" → {{"needs_transcript": false, "confidence": 0.9}}
+    - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95}}
+    - "Based on the video, what are hidden layers?" → {{"needs_transcript": true, "confidence": 0.95}}
+    """
+
+    prompt_template = PromptTemplate(
+        input_variables = ["question"],
+        template = router_prompt
+    )
+
+    return prompt_template
 
 def create_revision_prompt() -> PromptTemplate:
     """Create prompt template for revising an answer based on evaluator feedback."""
@@ -103,16 +132,16 @@ def create_revision_prompt() -> PromptTemplate:
 
 def create_queries_prompt() -> PromptTemplate:
     multiqueries_template = """
-    Generate 3 alternative phrasings of the question.
+    Generate 3 alternative phrasings of the query.
 
-    Question: "{question}"
+    QUERY: "{query}"
 
     RESPOND WITH ONLY JSON FORMAT, NO EXPLANATION:
     {{"queries": ["alternative 1", "alternative 2", "alternative 3"]}}
     """
 
     prompt_template = PromptTemplate(
-        input_variables=["question"],
+        input_variables=["query"],
         template = multiqueries_template
     )
 

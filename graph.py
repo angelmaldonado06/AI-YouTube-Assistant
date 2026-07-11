@@ -1,11 +1,12 @@
 from typing import TypedDict, Optional, List
 import json
 from rag_pipeline import retrieve_context, get_reranker
-from prompts import create_answer_prompt, create_revision_prompt, create_eval_prompt
+from prompts import create_answer_prompt, create_revision_prompt, create_eval_prompt, create_router_prompt
 from llms import get_llm, get_eval_llm
 from langgraph.graph import StateGraph, END, START
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+from langchain_core.output_parsers import StrOutputParser
 
 
 class RAGState(TypedDict):
@@ -23,9 +24,7 @@ class RAGState(TypedDict):
     critique_feedback: str
     critique_decision: str
     time_range: Optional[dict]
-
-# TODO: Upgrade 7 — refactor this to a class-based Router with Pydantic BaseModel
-# and tool binding. For now, keep it simple for Upgrade 1.
+    routing_decision: str
 
 def create_initial_state(query: str, faiss_index, conversation_history: List[BaseMessage], time_range: Optional[dict] = None) -> RAGState:
     """Build the graph state in one place so app.py stays simple."""
@@ -42,6 +41,45 @@ def create_initial_state(query: str, faiss_index, conversation_history: List[Bas
         critique_decision="",
         time_range=time_range
     )
+
+def router_node(state: RAGState) -> dict:
+    """Decide whether to retrieve from transcript or answer directly."""
+    llm = get_llm()
+    router_prompt = create_router_prompt()
+    router_chain = router_prompt | llm | StrOutputParser()
+    response = router_chain.invoke({"question": state['query']})
+
+    print(f"\n{'='*70}")
+    print(f"Query: {state['query']}")
+    print(f"{'='*70}")
+
+    try:
+        parsed = json.loads(response)
+        print(f"Parsed JSON: {parsed}")
+
+        needs_transcript = parsed.get("needs_transcript", False)
+        confidence = parsed.get("confidence", 0.0)
+
+        print(f"  needs_transcript: {needs_transcript}")
+        print(f"  confidence: {confidence}")
+
+        # Fallback: if confidence < 0.6, always retrieve
+        if confidence < 0.6:
+            decision = "retrieve"
+            print(f"\nLow confidence ({confidence}) → FALLBACK to retrieve")
+        else:
+            decision = "retrieve" if needs_transcript else "generate"
+            print(f"\nRouting decision: {decision}")
+
+        print(f"{'='*70}")
+        return {"routing_decision": decision}
+
+    except json.JSONDecodeError as e:
+        print(f"JSON Parse Error: {e}")
+        print(f"Defaulting to 'retrieve' for safety")
+        print(f"{'='*70}\n")
+        return {"routing_decision": "retrieve"}
+
 
 def retrieve_node(state: RAGState) -> RAGState:
     """Retrieve relevant transcript chunks based on query."""
@@ -106,19 +144,7 @@ def generation_node(state: RAGState) -> RAGState:
             "conversation_history": state['conversation_history'],
         }
 
-    answer = (prompt | llm).invoke(inputs)
-
-    prefixes = [
-        "here is the revised answer:",
-        "here's the revised answer:",
-        "here is my revised answer:",
-        "revised answer:",
-    ]
-    answer_lower = answer.lower().lstrip()
-    for prefix in prefixes:
-        if answer_lower.startswith(prefix):
-            answer = answer[answer.lower().index(prefix) + len(prefix):].strip()
-            break
+    answer = (prompt | llm | StrOutputParser()).invoke(inputs)
 
     state['final_answer'] = answer
 
@@ -129,11 +155,11 @@ def no_context_node(state: RAGState) -> RAGState:
     state["final_answer"] = "I could not find relevant transcript context for that question."
     return state
 
-def critique_node(state:RAGState) -> RAGState:
+def reflection_node(state:RAGState) -> RAGState:
     '''Evaluate output using external evaluator and decide if it needs revision'''
     evaluator = get_eval_llm()
     prompt = create_eval_prompt()
-    chain = prompt | evaluator
+    chain = prompt | evaluator | StrOutputParser()
 
     response = chain.invoke({
         'context': state["retrieved_context"],
@@ -181,15 +207,20 @@ def output_node(state: RAGState) -> RAGState:
 graph_builder = StateGraph(RAGState)
 
 # Add all nodes
+graph_builder.add_node("router", router_node)
 graph_builder.add_node("retrieve", retrieve_node)
 graph_builder.add_node("rerank", rerank_node)
 graph_builder.add_node("generate", generation_node)
 graph_builder.add_node("no_context", no_context_node)
-graph_builder.add_node("critique", critique_node)
+graph_builder.add_node("reflection", reflection_node)
 graph_builder.add_node("output", output_node)
 
-# Set entry point (always retrieve for YouTube assistant)
-graph_builder.add_edge(START, "retrieve")
+# Set entry point: route first, then decide whether to retrieve
+graph_builder.add_edge(START, "router")
+graph_builder.add_conditional_edges("router", lambda state: state["routing_decision"], {
+    "retrieve": "retrieve",
+    "generate": "generate",
+})
 
 def should_regenerate(state):
     critique_decision = state["critique_decision"].lower()
@@ -202,20 +233,20 @@ def should_regenerate(state):
         return "regenerate"
     else:
         return "output"
-graph_builder.add_conditional_edges("critique", should_regenerate, {
+graph_builder.add_conditional_edges("reflection", should_regenerate, {
     "regenerate" : "generate",
     "output":"output"
 })
 
 def has_context(state):
-    return "generate" if state["retrieved_context"].strip() else "no_context"
+    return "has_context" if state["retrieved_context"].strip() else "no_context"
 
-graph_builder.add_edge("retrieve", "rerank")
-graph_builder.add_conditional_edges("rerank", has_context, {
-    "generate": "generate",
+graph_builder.add_conditional_edges("retrieve", has_context, {
+    "has_context": "rerank",
     "no_context": "no_context",
 })
-graph_builder.add_edge("generate", "critique")
+graph_builder.add_edge("rerank", "generate")
+graph_builder.add_edge("generate", "reflection")
 graph_builder.add_edge("no_context", "output")
 graph_builder.add_edge("output", END)
 

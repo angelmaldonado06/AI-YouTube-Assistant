@@ -6,11 +6,11 @@ _judge_llm = None
 
 load_dotenv()
 
-def get_llm(temperature=0.4) -> ChatOpenAI:
+def get_llm() -> ChatOpenAI:
     """Create or return cached LLM instance."""
     global _generator_llm
     if _generator_llm is None:
-        _generator_llm = ChatOpenAI(model="gpt-4o-mini",temperature=temperature)
+        _generator_llm = ChatOpenAI(model="gpt-4o-mini",temperature=0.5)
     return _generator_llm
 
 def get_eval_llm():

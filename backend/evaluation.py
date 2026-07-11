@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 
 from datasets import Dataset
-from langchain_ollama import ChatOllama
 from ragas import evaluate
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
@@ -96,18 +95,17 @@ def build_eval_rows(video_url, eval_questions, retrieval_k=4) -> list[dict]:
     return rows
 
 
-def run_ragas_eval(video_url, dataset_path, retrieval_k=4, qa_model_name="llama3.1"):
+def run_ragas_eval(video_url, dataset_path, retrieval_k=4):
     """Evaluate RAG system on video using RAGAS metrics."""
     eval_questions = load_eval_questions(dataset_path)
     rows = build_eval_rows(
         video_url=video_url,
         eval_questions=eval_questions,
         retrieval_k=retrieval_k,
-        qa_model_name=qa_model_name,
     )
 
     dataset = Dataset.from_list(rows)
-    eval_llm = get_eval_llm(qa_model_name)
+    eval_llm = get_eval_llm()
     embedding_model = create_embedding_model()
 
     result = evaluate(
@@ -140,18 +138,12 @@ def main() -> None:
         default=4,
         help="Number of chunks to retrieve for each evaluation question.",
     )
-    parser.add_argument(
-        "--model",
-        default="llama3.1",
-        help="Ollama model name to use for QA generation and LLM-based evaluation.",
-    )
     args = parser.parse_args()
 
     result = run_ragas_eval(
         video_url=args.video_url,
         dataset_path=Path(args.dataset),
         retrieval_k=args.k,
-        qa_model_name=args.model,
     )
 
     print(result)

@@ -1,22 +1,21 @@
-from langchain_ollama import OllamaLLM
+# from langchain_ollama import OllamaLLM
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 
-_llm_cache = None
-_judge_cache = None
+_generator_llm = None
+_judge_llm = None
 
 
-def get_llm() -> OllamaLLM:
-    """Create or return cached Ollama LLM instance."""
-    global _llm_cache
-    if _llm_cache is None:
-        _llm_cache = OllamaLLM(model="llama3.1", temperature=0.3)
-    return _llm_cache
+def get_llm(temperature=0.4) -> ChatOpenAI:
+    """Create or return cached LLM instance."""
+    global _generator_llm
+    if _generator_llm is None:
+        _generator_llm = ChatOpenAI(model="gpt-4o-mini",temperature=temperature)
+    return _generator_llm
 
 def get_eval_llm():
     """Evaluation LLM — Mistral Nemo as judge."""
-    global _judge_cache
-    if _judge_cache is None:
-        _judge_cache = OllamaLLM(
-            model="mistral-nemo",
-            temperature=0
-        )
-    return _judge_cache
+    global _judge_llm
+    if _judge_llm is None:
+        _judge_llm = ChatOpenAI(model="gpt-4o-mini",temperature=0)
+    return _judge_llm

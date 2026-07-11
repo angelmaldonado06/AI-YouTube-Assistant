@@ -119,7 +119,7 @@ function goHome() {
     window.scrollTo(0, 0);
 }
 
-function clearChat() {
+async function clearChat() {
     turns = 0;
     document.getElementById('chat-messages').innerHTML = `
         <div class="msg-row">
@@ -129,10 +129,17 @@ function clearChat() {
             </div>
         </div>`;
     document.getElementById('turn-counter').textContent = '0 turns';
+
+    try {
+        await fetch(`${API}/clear`, { method: 'POST' });
+    } catch {
+        console.error('Could not reach the backend to clear conversation memory.');
+    }
 }
 
 document.getElementById('load-btn').addEventListener('click', loadVideo);
 document.getElementById('back-btn').addEventListener('click', goHome);
+document.getElementById('clear-btn').addEventListener('click', clearChat);
 document.getElementById('url-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') loadVideo();
 });

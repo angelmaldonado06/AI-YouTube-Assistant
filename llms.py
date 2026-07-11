@@ -1,10 +1,10 @@
-# from langchain_ollama import OllamaLLM
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
 _generator_llm = None
 _judge_llm = None
 
+load_dotenv()
 
 def get_llm(temperature=0.4) -> ChatOpenAI:
     """Create or return cached LLM instance."""

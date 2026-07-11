@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
-from app import summarize_video, answer_question, clear_conversation
+from video_session import summarize_video, answer_question, clear_conversation
 
 app = FastAPI()
 app.add_middleware(

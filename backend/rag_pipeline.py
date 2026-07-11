@@ -14,7 +14,7 @@ from transcript import (
     get_video_id,
     normalize_transcript_entries,
 )
-from helpers import is_cached, save_to_cache, load_from_cache
+from cache import is_cached, save_to_cache, load_from_cache
 
 _reranker_cache = None
 

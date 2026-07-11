@@ -1,4 +1,3 @@
-import gradio as gr
 from rag_pipeline import prepare_video
 from llms import get_llm
 from prompts import create_summary_prompt
@@ -79,46 +78,3 @@ def clear_conversation() -> None:
     """Reset conversation memory for the current video."""
     global conversation_history
     conversation_history = []
-
-# with gr.Blocks() as interface:
-#     video_url = gr.Textbox(
-#         label="YouTube Video URL",
-#         placeholder="Enter YouTube URL"
-#     )
-
-#     summary_output = gr.Textbox(
-#         label="Video Summary",
-#         lines=6
-#     )
-
-#     summarize_btn = gr.Button("Summarize Video")
-
-#     summarize_btn.click(
-#         summarize_video,
-#         inputs=[video_url],
-#         outputs=[summary_output]
-#     )
-
-#     question_input = gr.Textbox(
-#         label="Ask a Question"
-#     )
-
-#     with gr.Row():
-#         from_min = gr.Number(label="From (min)", value=None, precision=1)
-#         to_min = gr.Number(label="To (min)", value=None, precision=1)
-
-#     answer_output = gr.Textbox(
-#         label="Answer",
-#         lines=6
-#     )
-
-#     question_btn = gr.Button("Ask Question")
-
-#     question_btn.click(
-#         answer_question,
-#         inputs=[video_url, question_input, from_min, to_min],
-#         outputs=[answer_output]
-#     )
-
-# if __name__ == "__main__":
-#     interface.launch()

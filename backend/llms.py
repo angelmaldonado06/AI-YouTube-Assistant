@@ -14,7 +14,7 @@ def get_llm() -> ChatOpenAI:
     return _generator_llm
 
 def get_eval_llm():
-    """Evaluation LLM — Mistral Nemo as judge."""
+    """Evaluation/judge LLM instance."""
     global _judge_llm
     if _judge_llm is None:
         _judge_llm = ChatOpenAI(model="gpt-4o-mini",temperature=0)

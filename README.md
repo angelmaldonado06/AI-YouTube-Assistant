@@ -1,4 +1,4 @@
-# AI YouTube Research Assistant using RAG
+# AI YouTube Assistant
 
 A RAG-powered app that watches YouTube videos for you — ask it questions and it answers from the actual transcript instead of guessing.
 

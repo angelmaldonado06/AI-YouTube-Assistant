@@ -43,9 +43,6 @@ async function loadVideo() {
         if (response.ok) {
             const data = await response.json();
             document.getElementById('summary-content').textContent = data.summary || 'No summary available.';
-            if (data.duration_seconds) {
-                document.getElementById('strip-meta').textContent = '· ' + (data.duration_seconds / 60).toFixed(1) + ' min';
-            }
         } else {
             document.getElementById('summary-content').textContent = 'Could not generate summary.';
         }

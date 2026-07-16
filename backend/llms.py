@@ -10,7 +10,7 @@ def get_llm() -> ChatOpenAI:
     """Create or return cached LLM instance."""
     global _generator_llm
     if _generator_llm is None:
-        _generator_llm = ChatOpenAI(model="gpt-4o-mini",temperature=0.5)
+        _generator_llm = ChatOpenAI(model="gpt-4o-mini",temperature=0.7)
     return _generator_llm
 
 def get_eval_llm():

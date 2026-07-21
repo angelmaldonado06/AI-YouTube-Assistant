@@ -38,7 +38,7 @@ def create_answer_prompt() -> ChatPromptTemplate:
             - Extract the actual definition or explanation using wording as close as possible to the transcript
             - Include any examples given by the speaker
             - DEDUPLICATE: Mention each concept only once
-            - Use ONLY ONE timestamp (the earliest or most relevant)
+            - ALWAYS cite the single most relevant timestamp from the context in your answer, in the format (Timestamp: HH:MM:SS), so it stays available if the user later asks where this came from
         3. If NOT in the context:
             - Say: "The video does not mention this."
         4. THEN, only if you are certain the general knowledge answer is accurate, add:
@@ -72,10 +72,14 @@ def create_chat_prompt() -> ChatPromptTemplate:
         ("system",
         """You are a friendly AI assistant for a YouTube video Q&A tool.
 
-        This question does not require the video transcript (e.g. a greeting, small talk,
-        or a question about the conversation itself). Respond naturally and warmly using the
-        conversation history for context, and gently encourage the user to ask a question
-        about the video."""),
+        This question does not require a new video transcript lookup (e.g. a greeting, small
+        talk, or a question about the conversation itself, such as asking for a timestamp or
+        detail a previous answer already cited). Respond naturally and warmly using the
+        conversation history for context. If the user is asking about something already stated
+        in a previous answer (e.g. "what timestamp was that?"), answer directly from that prior
+        answer's text instead of saying you don't have it. Only if the conversation history
+        truly has nothing relevant, gently encourage the user to ask a question about the
+        video."""),
 
         MessagesPlaceholder(variable_name="conversation_history"),
 
@@ -99,8 +103,11 @@ def create_router_prompt() -> PromptTemplate:
     Rules:
     - needs_transcript=true if the question references the video/speaker/content, or asks
       the assistant to summarize, explain, or recall something that was said.
-    - needs_transcript=false if the question is a greeting, small talk, or general-knowledge
-      question unrelated to the video.
+    - needs_transcript=false if the question is a greeting, small talk, a general-knowledge
+      question unrelated to the video, or a question about something already stated earlier
+      in the conversation history (e.g. asking for a timestamp, source, or detail that a
+      previous answer already gave) — that can be answered from history alone, without a new
+      transcript lookup.
     - confidence: your confidence (0.0-1.0) in the needs_transcript decision.
 
     Examples:
@@ -110,6 +117,8 @@ def create_router_prompt() -> PromptTemplate:
     - "What does the speaker say about AI?" → {{"needs_transcript": true, "confidence": 0.95}}
     - "Based on the video, what are hidden layers?" → {{"needs_transcript": true, "confidence": 0.95}}
     - "What is the first message i sent you?" → {{"needs_transcript": false, "confidence": 0.9}}
+    - "What timestamp was that from?" (referring to your previous answer) → {{"needs_transcript": false, "confidence": 0.9}}
+    - "Where did you get that from?" (referring to your previous answer) → {{"needs_transcript": false, "confidence": 0.9}}
 
     """
 

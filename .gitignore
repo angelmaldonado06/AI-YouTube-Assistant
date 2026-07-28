@@ -209,3 +209,5 @@ __marimo__/
 
 # Video cache (generated FAISS indexes + transcripts)
 cache/
+
+.DS_Store

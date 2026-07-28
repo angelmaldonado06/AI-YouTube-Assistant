@@ -1,6 +1,6 @@
 # AI YouTube Assistant
 
-[![Watch Demo](https://img.youtube.com/vi/igu7WizLbs4/0.jpg)](https://youtu.be/igu7WizLbs4)
+https://github.com/user-attachments/assets/1189b911-c557-41dd-b361-1d52a3de67e8
 
 An AI app that watches YouTube videos for you — ask it questions and it answers from the actual transcript instead of guessing.
 

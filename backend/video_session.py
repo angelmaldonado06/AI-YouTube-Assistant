@@ -69,6 +69,9 @@ def answer_question(video_url, question, from_min=None, to_min=None) -> str:
 
         result = rag_graph.invoke(state)
         conversation_history = result['conversation_history']
+
+        print(f'\nFinal Response:\n{result['final_answer']}\n')
+
         return result['final_answer']
     else:
         return "No transcript available"
